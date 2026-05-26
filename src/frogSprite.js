@@ -1,0 +1,1 @@
+export const FROG_SPRITE = "./src/assets/toad.png";
