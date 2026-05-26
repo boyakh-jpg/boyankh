@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+// 두꺼비 스프라이트는 별도 파일에서 가져옵니다. 본인 파일의 export 이름/경로에 맞게 이 줄만 수정하세요.
 import { FROG_SPRITE } from "./frogSprite";
 
 const SW = 160, SH = 160, COLS = 4, ROWS = 4;
@@ -189,7 +190,7 @@ function Role({ onSelect }) {
 function Register({ onDone, onClose, onBack }) {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
-  const [d, setD] = useState({ propType:"", dealType:"", deposit:"", monthly:"", address:"", area:"", floor:"", direction:"", maintenance:"", parking:"", special:"", tenant:"", tenantEnd:"", feeRate:0.4, fastMode:null, directMode:false, certified:false });
+  const [d, setD] = useState({ propType:"", dealType:"", deposit:"", monthly:"", premium:"", address:"", area:"", floor:"", direction:"", maintenance:"", parking:"", special:"", tenant:"", tenantEnd:"", feeRate:0.4, fastMode:null, directMode:false, certified:false });
   const [cs, setCs] = useState(0);
   const [code, setCode] = useState("");
   const submitted = useRef(false);
@@ -205,12 +206,18 @@ function Register({ onDone, onClose, onBack }) {
   };
   const depositNum = parseInt(d.deposit, 10) || 0;
   const monthlyNum = parseInt(d.monthly, 10) || 0;
+  const premiumNum = parseInt(d.premium, 10) || 0;
+  // 입주권/분양권 여부 (프리미엄 입력칸을 띄움)
+  const isRights = d.propType === "입주권" || d.propType === "분양권";
+  // 입주권/분양권은 거래금액 = 권리가(또는 분양가) + 프리미엄
+  const rightsTotal = depositNum + premiumNum;
   // 가격 입력 미리보기
   const pricePreview = !d.deposit ? "" :
+    isRights ? (premiumNum ? `${d.propType==="분양권"?"분양가":"권리가"} ${formatMan(d.deposit)} + P ${formatMan(d.premium)} = 총 ${formatMan(String(rightsTotal))}` : `${d.propType==="분양권"?"분양가":"권리가"} ${formatMan(d.deposit)}`) :
     d.dealType === "월세" ? (monthlyNum ? `보증금 ${formatMan(d.deposit)} / 월 ${monthlyNum}만원` : `보증금 ${formatMan(d.deposit)}`) :
     formatMan(d.deposit);
-  // 수수료 산정 기준액(만원): 월세는 환산보증금(보증금 + 월세×100)
-  const feeBaseMan = d.dealType === "월세" ? depositNum + monthlyNum * 100 : depositNum;
+  // 수수료 산정 기준액(만원): 월세는 환산보증금, 입주권/분양권은 권리가+프리미엄
+  const feeBaseMan = isRights ? rightsTotal : (d.dealType === "월세" ? depositNum + monthlyNum * 100 : depositNum);
   const estFeeWon = Math.round(feeBaseMan * 10000 * (d.feeRate / 100));
   // 원 → "약 OO만원 / O억 O만원"
   const wonShort = n => n >= 1e8 ? `${Math.floor(n/1e8)}억${Math.round((n%1e8)/1e4) > 0 ? ` ${Math.round((n%1e8)/1e4).toLocaleString()}만` : ""}원` : n >= 1e4 ? `${Math.round(n/1e4).toLocaleString()}만원` : `${n.toLocaleString()}원`;
@@ -219,11 +226,11 @@ function Register({ onDone, onClose, onBack }) {
     // 주소에서 "OO구" 추출 (없으면 마포구 기본)
     const regionMatch = (d.address.match(/(\S+구)/) || [])[1] || "기타";
     const dongMatch = (d.address.match(/(\S+동)/) || [])[1] || "";
-    // price 문자열: 매매/전세는 만원→억/만 표기, 월세는 "보증금/월세만"
+    // price 문자열: 매매/전세는 만원→억/만 표기, 월세는 "보증금/월세만", 입주권/분양권은 총액
     const manToPrice = man => { const n=parseInt(man,10)||0; const eok=Math.floor(n/10000); const rest=n%10000; return eok>0?`${eok}억${rest>0?` ${rest.toLocaleString()}만`:""}`:`${n.toLocaleString()}만`; };
-    const priceStr = d.dealType === "월세" ? `${depositNum.toLocaleString()}/${monthlyNum}만` : manToPrice(d.deposit);
+    const priceStr = isRights ? manToPrice(String(rightsTotal)) : (d.dealType === "월세" ? `${depositNum.toLocaleString()}/${monthlyNum}만` : manToPrice(d.deposit));
     // 종류 매핑 (등록은 "빌라/다세대" 등 세분 → 목록 필터용 단순화)
-    const typeMap = { "아파트":"아파트", "빌라/다세대":"빌라", "단독주택":"빌라", "오피스텔":"오피스텔", "상가":"상가", "토지":"토지" };
+    const typeMap = { "아파트":"아파트", "빌라/다세대":"빌라", "단독주택":"빌라", "오피스텔":"오피스텔", "상가":"상가", "토지":"토지", "입주권":"입주권", "분양권":"분양권", "재개발·재건축":"재개발" };
     const doneLabelMap = { "매매":"매도완료", "전세":"전세완료", "월세":"임대완료" };
     return {
       id: "u" + Date.now(),
@@ -231,12 +238,14 @@ function Register({ onDone, onClose, onBack }) {
       complex: d.address.split(" ").slice(-1)[0] || "신규 매물",
       propType: typeMap[d.propType] || "아파트",
       dealType: d.dealType,
-      price: priceStr, priceNum: depositNum,
+      price: priceStr, priceNum: isRights ? rightsTotal : depositNum,
+      premium: isRights ? premiumNum : null,
       area: parseInt(d.area, 10) || 84, floor: parseInt(d.floor, 10) || 1,
       fee: d.feeRate + "%", fast: !!d.fastMode,
       views: 0, ago: "방금 전",
       x: 50, y: 50, badge: "NEW",
-      status: "active", doneLabel: doneLabelMap[d.dealType] || "거래완료", completedDaysAgo: null,
+      status: "active", doneLabel: isRights ? "양도완료" : (doneLabelMap[d.dealType] || "거래완료"), completedDaysAgo: null,
+      expiresInDays: 14, // 의뢰 기한: 기본 2주
     };
   };
   // 완료 스텝 진입 시 매물 1회 등록
@@ -266,9 +275,10 @@ function Register({ onDone, onClose, onBack }) {
           </div>
           {step === 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {["아파트","빌라/다세대","단독주택","오피스텔","상가","토지"].map(t => (
-                <div key={t} onClick={() => { set("propType", t); setTimeout(next, 160); }} style={{ padding: "22px 12px", borderRadius: 18, border: `2px solid ${d.propType===t?C.green:C.line}`, background: d.propType===t?G.greenSoft:G.card, textAlign: "center", cursor: "pointer", transition: "all .15s", boxShadow: d.propType===t?"none":SH2 }}>
+              {[["아파트","주거"],["빌라/다세대","주거"],["단독주택","주거"],["오피스텔","주거·수익"],["상가","수익형"],["토지","대지·전답"],["입주권","조합원 권리"],["분양권","청약 당첨"],["재개발·재건축","정비사업"]].map(([t, ds]) => (
+                <div key={t} onClick={() => { set("propType", t); setTimeout(next, 160); }} style={{ padding: "18px 12px", borderRadius: 18, border: `2px solid ${d.propType===t?C.green:C.line}`, background: d.propType===t?G.greenSoft:G.card, textAlign: "center", cursor: "pointer", transition: "all .15s", boxShadow: d.propType===t?"none":SH2 }}>
                   <div style={{ fontSize: 15, fontWeight: d.propType===t?700:500, color: d.propType===t?C.greenInk:C.dark }}>{t}</div>
+                  <div style={{ fontSize: 11, color: C.gray, marginTop: 3 }}>{ds}</div>
                 </div>
               ))}
             </div>
@@ -285,7 +295,26 @@ function Register({ onDone, onClose, onBack }) {
           )}
           {step === 2 && (
             <>
-              {(d.dealType === "매매" || d.dealType === "전세") && (
+              {isRights && (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{d.propType === "분양권" ? "분양가" : "권리가액"}</div>
+                    <div style={{ position: "relative" }}>
+                      <input inputMode="numeric" placeholder="예: 80000" value={d.deposit} onChange={e => set("deposit", e.target.value.replace(/[^0-9]/g, ""))} autoFocus style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
+                      <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>프리미엄 (웃돈)</div>
+                    <div style={{ position: "relative" }}>
+                      <input inputMode="numeric" placeholder="예: 15000 (마이너스P는 0)" value={d.premium} onChange={e => set("premium", e.target.value.replace(/[^0-9]/g, ""))} style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
+                      <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.gray, marginTop: 5 }}>프리미엄이 없으면 0, 마이너스 프리미엄도 0으로 입력하고 메모에 적어주세요</div>
+                  </div>
+                </>
+              )}
+              {!isRights && (d.dealType === "매매" || d.dealType === "전세") && (
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{d.dealType === "매매" ? "매매가" : "전세 보증금"}</div>
                   <div style={{ position: "relative" }}>
@@ -294,7 +323,7 @@ function Register({ onDone, onClose, onBack }) {
                   </div>
                 </div>
               )}
-              {d.dealType === "월세" && (
+              {!isRights && d.dealType === "월세" && (
                 <>
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>보증금</div>
@@ -312,9 +341,9 @@ function Register({ onDone, onClose, onBack }) {
                   </div>
                 </>
               )}
-              {!d.dealType && <div style={{ fontSize: 14, color: C.gray, textAlign: "center", padding: "20px 0" }}>먼저 거래 유형을 선택해 주세요</div>}
+              {!d.dealType && !isRights && <div style={{ fontSize: 14, color: C.gray, textAlign: "center", padding: "20px 0" }}>먼저 거래 유형을 선택해 주세요</div>}
               {pricePreview && <div style={{ background: G.greenSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: 14, color: C.greenInk, fontWeight: 700, textAlign: "center" }}>{pricePreview}</div>}
-              <Btn onClick={next} disabled={!d.deposit || (d.dealType === "월세" && !d.monthly)}>다음</Btn>
+              <Btn onClick={next} disabled={!d.deposit || (!isRights && d.dealType === "월세" && !d.monthly)}>다음</Btn>
             </>
           )}
           {step === 3 && (
@@ -528,7 +557,7 @@ const PROPERTIES = [
   { id: "p50", region: "강동구", dong: "고덕동", complex: "한가람5차", propType: "아파트", dealType: "전세", price: "8억 3,844만", priceNum: 83844, area: 59, floor: 26, fee: "0.3%", fast: true, views: 22, ago: "1주 전", x: 81, y: 55, badge: "HOT", status: "active", doneLabel: "전세완료", completedDaysAgo: null },
 ];
 const REGIONS = ["전체", "강남구", "서초구", "송파구", "강동구", "마포구", "용산구", "성동구", "영등포구"];
-const PROP_TYPES = ["전체", "아파트", "빌라", "오피스텔", "상가", "토지"];
+const PROP_TYPES = ["전체", "아파트", "빌라", "오피스텔", "상가", "토지", "입주권", "분양권", "재개발"];
 
 // ===== 완료 매물 처리 헬퍼 =====
 // 완료 후 3일이 지나면 목록에서 자동으로 사라짐
@@ -543,6 +572,14 @@ function applyStatusFilter(list, mode) {
   return list.filter(p => p.status === "active");
 }
 const STATUS_FILTERS = ["거래중만 보기", "완료 포함"];
+
+// ===== 의뢰 기한 처리 헬퍼 =====
+const DEFAULT_TERM_DAYS = 14;   // 기본 의뢰 기한 2주
+const EXTEND_DAYS = 14;         // 원터치 연장 단위
+const EXPIRE_SOON_DAYS = 3;     // 만료 임박 알림 기준
+const termLeft = p => p.expiresInDays ?? DEFAULT_TERM_DAYS;       // 남은 기한(일)
+const isExpiringSoon = p => p.status === "active" && termLeft(p) <= EXPIRE_SOON_DAYS; // 곧 만료
+const termLabel = p => { const n = termLeft(p); return n <= 0 ? "기한 만료" : n === 1 ? "내일 만료" : `${n}일 남음`; };
 
 // ===== 예상 중개 수수료 계산 =====
 // 월세 가격문자열에서 월세액(만원) 파싱: "2,000/76만" → 76
@@ -604,6 +641,48 @@ function DoneBadge({ label, tone = "gray" }) {
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#EDEFEE", color: "#7B8580", fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 8, letterSpacing: ".2px" }}>
       <span style={{ width: 5, height: 5, borderRadius: 3, background: "#9AA8A0" }}/>{label}
     </span>
+  );
+}
+
+// 연락함 뱃지 (이미 연락/문의한 매물·집주인 표시)
+function ContactBadge({ label = "연락함", tone = "green" }) {
+  const ink = tone === "gold" ? C.goldInk : C.greenInk;
+  const soft = tone === "gold" ? C.goldSoft : C.greenSoft;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: soft, color: ink, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 8 }}>
+      <span style={{ fontSize: 10 }}>✓</span>{label}
+    </span>
+  );
+}
+
+// 인라인 메모: 평소엔 "메모" 버튼, 누르면 입력칸 펼침. 저장하면 메모 표시.
+function NoteField({ value, onChange, tone = "green" }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+  const ink = tone === "gold" ? C.goldInk : C.greenInk;
+  const soft = tone === "gold" ? C.goldSoft : C.greenSoft;
+  const save = () => { onChange(draft.trim()); setOpen(false); };
+  if (!open) {
+    return value ? (
+      <div onClick={(e) => { e.stopPropagation(); setDraft(value); setOpen(true); }} style={{ display: "flex", alignItems: "flex-start", gap: 6, background: soft, borderRadius: 10, padding: "8px 11px", marginTop: 8, cursor: "pointer" }}>
+        <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>📝</span>
+        <span style={{ fontSize: 12, color: C.mid, lineHeight: 1.5, flex: 1, wordBreak: "break-word" }}>{value}</span>
+        <span style={{ fontSize: 11, color: ink, fontWeight: 700, flexShrink: 0 }}>수정</span>
+      </div>
+    ) : (
+      <button onClick={(e) => { e.stopPropagation(); setDraft(""); setOpen(true); }} style={{ marginTop: 8, background: "none", border: `1px dashed ${C.line}`, borderRadius: 10, padding: "7px 11px", color: C.gray, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
+        <span>📝</span> 메모 추가
+      </button>
+    );
+  }
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 8 }}>
+      <textarea value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus placeholder="예: 집주인 친절함 · 5/30 통화 예정" rows={2} style={{ width: "100%", padding: "9px 11px", borderRadius: 10, border: `1.5px solid ${ink}`, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "none", lineHeight: 1.5 }}/>
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <button onClick={save} style={{ flex: 1, padding: "8px 0", background: ink, border: "none", borderRadius: 9, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>저장</button>
+        <button onClick={() => setOpen(false)} style={{ padding: "8px 14px", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 9, color: C.gray, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>취소</button>
+      </div>
+    </div>
   );
 }
 
@@ -716,7 +795,7 @@ function Home({ onRegister, onMyList, role, onSwitchRole }) {
       {sheet && <ListSheet kind={sheet} onClose={() => setSheet(null)}/>}
       <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-          <div><div style={{ color: "#ffffffcc", fontSize: 13 }}>안녕하세요</div><div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>부동산의 요정</div></div>
+          <div><div style={{ color: "#ffffffcc", fontSize: 13 }}>집주인</div><div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>집 내놓기</div></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <RoleToggle role={role} onClick={onSwitchRole}/>
             <Frog mood="calm" size={52}/>
@@ -838,6 +917,7 @@ function Broker({ properties = PROPERTIES, role, onSwitchRole, onOpenChat, openM
   const [sort, setSort] = useState("최신순");
   const [statusFilter, setStatusFilter] = useState("거래중만 보기"); // 기본: 거래중인 매물만
   const [viewed, setViewed] = useState({});      // 내가 열람한 매물 기록 {id: timestamp}
+  const [notes, setNotes] = useState({});        // 매물별 메모 {id: text}
   const [activeId, setActiveId] = useState(null);
   const tier = "골드";
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2000); };
@@ -865,6 +945,7 @@ function Broker({ properties = PROPERTIES, role, onSwitchRole, onOpenChat, openM
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {done ? <DoneBadge label={l.doneLabel}/> : (l.badge && <Tag tone={l.badge==="NEW"?"green":"gold"}>{l.badge}</Tag>)}
+            {!done && contacted[l.id] && <ContactBadge label="연락함" tone={l.fast ? "gold" : "green"}/>}
             <span style={{ fontSize: 11, color: C.gray }}>{l.ago}</span>
           </div>
           <span style={{ fontSize: 12, fontWeight: 700, color: l.fast ? C.goldInk : C.greenInk }}>{l.fast ? "빠른의뢰" : "안심의뢰"}</span>
@@ -888,6 +969,7 @@ function Broker({ properties = PROPERTIES, role, onSwitchRole, onOpenChat, openM
         ) : (
           <button onClick={() => { if (l.fast) handleFast(l); else openApply(l); }} style={{ width: "100%", padding: "13px 0", background: l.fast ? G.gold : G.header, border: "none", borderRadius: 14, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{l.fast ? "번호 확인하기 (-2,000P)" : "중개할게요 · 채팅 신청"}</button>
         )}
+        <NoteField value={notes[l.id]} onChange={t => setNotes(n => ({ ...n, [l.id]: t }))} tone={l.fast ? "gold" : "green"}/>
       </div>
     );
   };
@@ -895,12 +977,12 @@ function Broker({ properties = PROPERTIES, role, onSwitchRole, onOpenChat, openM
   return (
     <div style={{ paddingBottom: 90, background: G.pageBg, minHeight: "100%", position: "relative" }}>
       {toast && <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", background: "#3A4A42ee", color: "#fff", padding: "10px 18px", borderRadius: 20, fontSize: 13, zIndex: 60, animation: "fadeIn .2s", boxShadow: SH1 }}>{toast}</div>}
-      <div style={{ background: G.header, padding: "46px 20px 22px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div><div style={{ color: "#ffffffcc", fontSize: 12 }}>공인중개사 전용</div><div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>의뢰 매물</div></div>
+      <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div><div style={{ color: "#ffffffcc", fontSize: 13 }}>공인중개사</div><div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>의뢰받은 매물</div></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <RoleToggle role={role} onClick={onSwitchRole}/>
-            <Frog mood="smug" size={50}/>
+            <Frog mood="smug" size={52}/>
           </div>
         </div>
         <div style={{ background: "#ffffff26", borderRadius: 16, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #ffffff33" }}>
@@ -975,13 +1057,16 @@ const CHATS = [
     ] },
 ];
 
-function ChatList({ onOpen }) {
+function ChatList({ onOpen, role, onSwitchRole }) {
   return (
     <div style={{ paddingBottom: 90, background: G.pageBg, minHeight: "100%" }}>
-      <div style={{ background: G.header, padding: "46px 20px 22px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
+      <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div><div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>채팅</div><div style={{ color: "#ffffffcc", fontSize: 13 }}>진행 중인 대화 {CHATS.length}건</div></div>
-          <Frog mood="joyful" size={50}/>
+          <div><div style={{ color: "#ffffffcc", fontSize: 13 }}>진행 중인 대화 {CHATS.length}건</div><div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>채팅</div></div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <RoleToggle role={role} onClick={onSwitchRole}/>
+            <Frog mood="joyful" size={52}/>
+          </div>
         </div>
       </div>
       <div style={{ padding: "14px 16px" }}>
@@ -1074,6 +1159,7 @@ function BuyerExplore({ properties = PROPERTIES, onSwitchRole, viewerRole = "buy
   const [statusFilter, setStatusFilter] = useState("거래중만 보기"); // 기본: 거래중인 매물만
   const [activeId, setActiveId] = useState(null);
   const [unlocked, setUnlocked] = useState({});
+  const [notes, setNotes] = useState({});        // 매물별 메모
   const [toast, setToast] = useState("");
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2000); };
 
@@ -1088,15 +1174,16 @@ function BuyerExplore({ properties = PROPERTIES, onSwitchRole, viewerRole = "buy
   return (
     <div style={{ paddingBottom: 90, background: G.pageBg, minHeight: "100%", position: "relative" }}>
       {toast && <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", background: "#3A4A42ee", color: "#fff", padding: "10px 18px", borderRadius: 20, fontSize: 13, zIndex: 60, animation: "fadeIn .2s", boxShadow: SH1 }}>{toast}</div>}
-      <div style={{ background: G.header, padding: "46px 20px 22px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
+      <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ color: "#ffffffcc", fontSize: 12 }}>{viewerRole === "owner" ? "집주인 · 직거래 시세 참고" : viewerRole === "broker" ? "중개사 · 직거래 시장 보기" : "직거래 매수자 전용"}</div>
-            <div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>직거래 매물 둘러보기</div>
+            <div style={{ color: "#ffffffcc", fontSize: 13 }}>{viewerRole === "owner" ? "집주인 · 시세 참고" : viewerRole === "broker" ? "공인중개사 · 시장 보기" : "직거래 매수자"}</div>
+            <div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>직거래 매물</div>
           </div>
-          {viewerRole === "buyer"
-            ? <RoleToggle role="buyer" onClick={onSwitchRole}/>
-            : <Frog mood="cool" size={48}/>}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <RoleToggle role={viewerRole} onClick={onSwitchRole}/>
+            <Frog mood="cool" size={52}/>
+          </div>
         </div>
       </div>
       <div style={{ padding: "16px 16px 0" }}>
@@ -1114,7 +1201,7 @@ function BuyerExplore({ properties = PROPERTIES, onSwitchRole, viewerRole = "buy
           return (
             <div key={p.id} style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: hi?"0 0 0 2px "+C.gold+", "+SH1:SH1, transition: "box-shadow .2s", opacity: done?0.78:1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>{done ? <DoneBadge label={p.doneLabel}/> : (p.badge && <Tag tone={p.badge==="NEW"?"green":"gold"}>{p.badge}</Tag>)}<span style={{ fontSize: 11, color: C.gray }}>{p.ago}</span></div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>{done ? <DoneBadge label={p.doneLabel}/> : (p.badge && <Tag tone={p.badge==="NEW"?"green":"gold"}>{p.badge}</Tag>)}{!done && open && <ContactBadge label="연락함" tone="gold"/>}<span style={{ fontSize: 11, color: C.gray }}>{p.ago}</span></div>
                 <span style={{ fontSize: 11, color: C.gray }}>👁 {p.views}</span>
               </div>
               <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>{p.region} {p.dong} · {p.propType} {p.dealType}</div>
@@ -1128,6 +1215,7 @@ function BuyerExplore({ properties = PROPERTIES, onSwitchRole, viewerRole = "buy
               ) : (
                 <button onClick={() => openPay(p)} style={{ width: "100%", padding: "13px 0", background: G.gold, border: "none", borderRadius: 14, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>연락처 열람 (10,000원)</button>
               )}
+              {!done && <NoteField value={notes[p.id]} onChange={t => setNotes(n => ({ ...n, [p.id]: t }))} tone="gold"/>}
             </div>
           );
         })}
@@ -1145,10 +1233,13 @@ function Subscription({ onSwitchRole }) {
   ];
   return (
     <div style={{ paddingBottom: 90, background: G.pageBg, minHeight: "100%" }}>
-      <div style={{ background: G.header, padding: "46px 20px 24px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
+      <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div><div style={{ color: "#ffffffcc", fontSize: 12 }}>공인중개사 멤버십</div><div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>구독 등급</div></div>
-          <RoleToggle role="broker" onClick={onSwitchRole}/>
+          <div><div style={{ color: "#ffffffcc", fontSize: 13 }}>공인중개사 멤버십</div><div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>구독 등급</div></div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <RoleToggle role="broker" onClick={onSwitchRole}/>
+            <Frog mood="smug" size={52}/>
+          </div>
         </div>
       </div>
       <div style={{ padding: 16 }}>
@@ -1181,10 +1272,11 @@ function Subscription({ onSwitchRole }) {
   );
 }
 
-function MyList({ properties = [], onRegister, onSetDone }) {
+function MyList({ properties = [], onRegister, onSetDone, onExtendTerm, role, onSwitchRole }) {
   const [view, setView] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [toast, setToast] = useState("");
+  const [notes, setNotes] = useState({});        // 매물별 메모 {id: text}
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2200); };
   // 기존 데모 매물 (상세 통계·열람내역 보유). 자체 dealState로 완료 토글.
   const [demoListings, setDemoListings] = useState([
@@ -1195,7 +1287,7 @@ function MyList({ properties = [], onRegister, onSetDone }) {
         { name: "박지훈 공인중개사", office: "마포 한강공인중개사", when: "1시간 전", sec: 42 },
         { name: "이수연 공인중개사", office: "공덕 부동산플러스", when: "3시간 전", sec: 18 },
       ] },
-    { id: "demo2", type: "아파트 전세", dealType: "전세", region: "송파구", dong: "잠실동", addr: "송파구 잠실동 리센츠", detail: "59㎡ · 7층 · 동향", price: "6억", priceNum: 60000, fee: "0.3%", status: "안심의뢰", tone: "green", fast: false, brokers: 14, direct: 5, days: 5, views: 41, dealState: "active", doneLabel: "전세완료",
+    { id: "demo2", type: "아파트 전세", dealType: "전세", region: "송파구", dong: "잠실동", addr: "송파구 잠실동 리센츠", detail: "59㎡ · 7층 · 동향", price: "6억", priceNum: 60000, fee: "0.3%", status: "안심의뢰", tone: "green", fast: false, brokers: 14, direct: 5, days: 2, views: 41, dealState: "active", doneLabel: "전세완료",
       viewLog: [
         { name: "정하늘 공인중개사", office: "잠실 리더스부동산", when: "5분 전", sec: 210 },
         { name: "강도윤 공인중개사", office: "송파 더공인중개사", when: "40분 전", sec: 88 },
@@ -1208,7 +1300,7 @@ function MyList({ properties = [], onRegister, onSetDone }) {
     region: p.region, dong: p.dong, addr: `${p.region} ${p.dong} ${p.complex}`.trim(),
     detail: `${p.area}㎡ · ${p.floor}층`, price: p.price, priceNum: p.priceNum, fee: p.fee,
     status: p.fast ? "빠른의뢰" : "안심의뢰", tone: p.fast ? "gold" : "green", fast: p.fast,
-    brokers: 0, direct: 0, days: 14, views: p.views,
+    brokers: 0, direct: 0, days: p.expiresInDays ?? 14, views: p.views,
     dealState: p.status, doneLabel: p.doneLabel, fromStore: true,
     viewLog: [],
   }));
@@ -1220,6 +1312,12 @@ function MyList({ properties = [], onRegister, onSetDone }) {
     else { setDemoListings(ls => ls.map(x => x.id === l.id ? { ...x, dealState: done ? "done" : "active" } : x)); }
     showToast(done ? "거래 완료로 변경됐어요 · 중개사·매수자 화면에 완료 표시" : "다시 거래중으로 변경됐어요");
   };
+  // 의뢰 기한 2주 연장
+  const extendTerm = l => {
+    if (l.fromStore) { onExtendTerm && onExtendTerm(l.id); }
+    else { setDemoListings(ls => ls.map(x => x.id === l.id ? { ...x, days: (x.days || 0) + 14 } : x)); }
+    showToast("의뢰 기한이 2주 연장됐어요");
+  };
   if (view !== null) {
     const l = listings[view];
     if (!l) { setView(null); return null; }
@@ -1229,7 +1327,7 @@ function MyList({ properties = [], onRegister, onSetDone }) {
         {toast && <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", background: "#3A4A42ee", color: "#fff", padding: "10px 18px", borderRadius: 20, fontSize: 13, zIndex: 60, animation: "fadeIn .2s", boxShadow: SH1, textAlign: "center", maxWidth: "88%" }}>{toast}</div>}
         {sheet && <ListSheet kind={sheet} onClose={() => setSheet(null)}/>}
         <div style={{ background: G.header, padding: "46px 20px 22px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
-          <button onClick={() => setView(null)} style={{ background: "none", border: "none", color: "#ffffffe0", fontSize: 22, cursor: "pointer", marginBottom: 8 }}>←</button>
+          <button onClick={() => setView(null)} style={{ background: "none", border: "none", color: "#fff", fontSize: 24, cursor: "pointer", padding: 0, marginBottom: 8 }}>←</button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ color: "#fff", fontSize: 18, fontWeight: 800 }}>{l.addr}</div>
             {done && <span style={{ background: "#ffffff2e", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 8 }}>{l.doneLabel}</span>}
@@ -1293,15 +1391,19 @@ function MyList({ properties = [], onRegister, onSetDone }) {
     <div style={{ paddingBottom: 90, background: G.pageBg, minHeight: "100%" }}>
       <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div><div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>내 의뢰 매물</div><div style={{ color: "#ffffffcc", fontSize: 13 }}>진행 중인 의뢰를 확인하세요</div></div>
-          <Frog mood="calm" size={52}/>
+          <div><div style={{ color: "#ffffffcc", fontSize: 13 }}>집주인</div><div style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>내 의뢰 매물</div></div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <RoleToggle role={role} onClick={onSwitchRole}/>
+            <Frog mood="calm" size={52}/>
+          </div>
         </div>
       </div>
       <div style={{ padding: 16 }}>
         {listings.map((l, i) => {
           const done = l.dealState === "done";
+          const soon = !done && (l.days ?? 14) <= 3;   // 만료 임박
           return (
-          <div key={i} onClick={() => setView(i)} style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: SH1, cursor: "pointer", opacity: done?0.82:1 }}>
+          <div key={i} onClick={() => setView(i)} style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: soon ? "0 0 0 1.5px "+C.gold+", "+SH1 : SH1, cursor: "pointer", opacity: done?0.82:1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <div><div style={{ fontSize: 11, color: C.gray, marginBottom: 3 }}>{l.type}</div><div style={{ fontSize: 15, fontWeight: 700, color: C.dark }}>{l.addr}</div><div style={{ fontSize: 12, color: C.gray }}>{l.detail}</div></div>
               {done ? <DoneBadge label={l.doneLabel}/> : <Tag tone={l.tone}>{l.status}</Tag>}
@@ -1310,8 +1412,15 @@ function MyList({ properties = [], onRegister, onSetDone }) {
             <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
               <span style={{ fontSize: 12, color: C.greenInk, fontWeight: 600 }}>중개사 {l.brokers}명</span>
               <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 600 }}>직거래 {l.direct}건</span>
-              <span style={{ fontSize: 12, color: C.gray }}>{done ? "거래 종료" : `D-${l.days}`}</span>
+              <span style={{ fontSize: 12, color: done ? C.gray : soon ? C.goldInk : C.gray, fontWeight: soon ? 700 : 400 }}>{done ? "거래 종료" : (l.days ?? 14) <= 0 ? "기한 만료" : (l.days ?? 14) === 1 ? "내일 만료" : `${l.days}일 남음`}</span>
             </div>
+            {soon && (
+              <div style={{ marginTop: 10, background: G.goldSoft, borderRadius: 12, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 700, flex: 1, lineHeight: 1.4 }}>곧 의뢰가 만료돼요<br/><span style={{ fontWeight: 500, color: C.mid, fontSize: 11 }}>연장하지 않으면 목록에서 내려가요</span></span>
+                <button onClick={(e) => { e.stopPropagation(); extendTerm(l); }} style={{ flexShrink: 0, padding: "8px 14px", background: G.gold, border: "none", borderRadius: 10, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>2주 연장</button>
+              </div>
+            )}
+            <NoteField value={notes[l.id]} onChange={t => setNotes(n => ({ ...n, [l.id]: t }))} tone={l.tone}/>
           </div>
           );
         })}
@@ -1332,6 +1441,8 @@ export default function App() {
   const addProperty = p => setProperties(prev => [{ ...p, mine: true }, ...prev]);
   // 거래 완료/되돌리기 토글
   const setDealDone = (id, done) => setProperties(prev => prev.map(p => p.id === id ? { ...p, status: done ? "done" : "active", completedDaysAgo: done ? 0 : null } : p));
+  // 의뢰 기한 2주 연장
+  const extendTerm = id => setProperties(prev => prev.map(p => p.id === id ? { ...p, expiresInDays: (p.expiresInDays ?? 14) + 14 } : p));
   const closeModal = () => setModal(null);
   const switchRole = () => {
     const order = ["owner", "broker", "buyer"];
@@ -1351,7 +1462,7 @@ export default function App() {
   // 탭 아이콘: 미니멀 도형
   const TabIcon = ({ active }) => (<div style={{ width: 18, height: 18, borderRadius: 6, background: active ? C.green : "transparent", border: `2px solid ${active ? C.green : C.gray}`, transition: "all .15s" }}/>);
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "linear-gradient(135deg,#D6EEDD,#C5E6D2)", fontFamily: "'Apple SD Gothic Neo','Noto Sans KR',sans-serif" }}>
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", padding: "16px 0", boxSizing: "border-box", overflowY: "auto", background: "linear-gradient(135deg,#D6EEDD,#C5E6D2)", fontFamily: "'Apple SD Gothic Neo','Noto Sans KR',sans-serif" }}>
       <style>{`
         @keyframes frogPop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
         @keyframes slideNext{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}
@@ -1361,7 +1472,7 @@ export default function App() {
         *{-webkit-tap-highlight-color:transparent}
         ::-webkit-scrollbar{display:none}
       `}</style>
-      <div style={{ width: 393, height: 852, background: C.bg, borderRadius: 50, overflow: "hidden", boxShadow: "0 36px 90px rgba(60,90,70,.4)", display: "flex", flexDirection: "column", position: "relative" }}>
+      <div style={{ width: 393, height: 852, flexShrink: 0, background: C.bg, borderRadius: 50, overflow: "hidden", boxShadow: "0 36px 90px rgba(60,90,70,.4)", display: "flex", flexDirection: "column", position: "relative" }}>
         <div style={{ height: 44, background: "transparent", position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 24px", zIndex: 30, pointerEvents: "none" }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: lightHeader ? C.dark : "#fff" }}>9:41</span>
           <span style={{ fontSize: 12, color: lightHeader ? C.dark : "#fff" }}>●●●</span>
@@ -1372,11 +1483,11 @@ export default function App() {
           {screen === "role" && <Role onSelect={r => { setRole(r); setScreen(r === "broker" ? "broker" : r === "buyer" ? "buyer" : "home"); }}/>}
           {screen === "home" && <Home onRegister={() => setScreen("register")} onMyList={() => setScreen("mylist")} role={role} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
-          {screen === "mylist" && <MyList properties={properties} onRegister={() => setScreen("register")} onSetDone={setDealDone}/>}
+          {screen === "mylist" && <MyList properties={properties} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} role={role} onSwitchRole={switchRole}/>}
           {screen === "broker" && <Broker properties={properties} role={role} onSwitchRole={switchRole} onOpenChat={() => openChat("c1")} openModal={setModal}/>}
           {screen === "buyer" && <BuyerExplore properties={properties} onSwitchRole={switchRole} viewerRole="buyer" openModal={setModal}/>}
-          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} openModal={setModal}/>}
-          {screen === "chatlist" && <ChatList onOpen={openChat}/>}
+          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} onSwitchRole={switchRole} openModal={setModal}/>}
+          {screen === "chatlist" && <ChatList onOpen={openChat} role={role} onSwitchRole={switchRole}/>}
           {screen === "chatroom" && <ChatRoom chatId={activeChat} onBack={() => setScreen("chatlist")}/>}
           {screen === "profile" && role === "broker" && <Subscription onSwitchRole={switchRole}/>}
           {screen === "profile" && role !== "broker" && (
