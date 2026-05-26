@@ -195,6 +195,31 @@ function Register({ onDone, onClose, onBack }) {
   const [code, setCode] = useState("");
   const submitted = useRef(false);
   const set = (k, v) => setD(p => ({ ...p, [k]: v }));
+  const TOTAL = 10;
+  const next = () => { setDir(1); setStep(s => s + 1); };
+  const back = () => { if (step === 0) return onBack(); setDir(-1); setStep(s => s - 1); };
+  const DEAL_OPTIONS_BY_PROP = {
+    "아파트": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
+    "빌라/다세대": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
+    "단독주택": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
+    "오피스텔": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
+    "상가": [["매매", "상가 소유권 이전"], ["임대", "보증금+월 임대료+권리금"]],
+    "토지": [["매매", "토지 소유권 이전"]],
+    "입주권": [["권리양도", "조합원 권리 이전"]],
+    "분양권": [["전매", "분양계약 권리 이전"]],
+    "재개발·재건축": [["권리양도", "정비사업 권리 이전"]],
+  };
+  const dealOptions = DEAL_OPTIONS_BY_PROP[d.propType] || [];
+  const rightsTypes = ["입주권", "분양권", "재개발·재건축"];
+  const selectPropType = propType => {
+    const nextDeal = (DEAL_OPTIONS_BY_PROP[propType] || [])[0]?.[0] || "";
+    setD(p => ({ ...p, propType, dealType: nextDeal, deposit: "", monthly: "", premium: "" }));
+    setTimeout(next, 160);
+  };
+  const selectDealType = dealType => {
+    setD(p => ({ ...p, dealType, deposit: "", monthly: "", premium: "" }));
+    setTimeout(next, 160);
+  };
   // 만원 단위 숫자 → "12억 5,000만원" 형태
   const formatMan = man => {
     const n = parseInt(man, 10);
@@ -207,17 +232,22 @@ function Register({ onDone, onClose, onBack }) {
   const depositNum = parseInt(d.deposit, 10) || 0;
   const monthlyNum = parseInt(d.monthly, 10) || 0;
   const premiumNum = parseInt(d.premium, 10) || 0;
-  // 입주권/분양권 여부 (프리미엄 입력칸을 띄움)
-  const isRights = d.propType === "입주권" || d.propType === "분양권";
-  // 입주권/분양권은 거래금액 = 권리가(또는 분양가) + 프리미엄
+  // 권리성 상품은 거래금액 = 권리가/분양가 + 프리미엄
+  const isRights = rightsTypes.includes(d.propType);
+  const isLand = d.propType === "토지";
+  const isCommercialLease = d.propType === "상가" && d.dealType === "임대";
+  const isMonthlyLike = d.dealType === "월세" || isCommercialLease;
+  const rightsBaseLabel = d.propType === "분양권" ? "분양가" : "권리가";
   const rightsTotal = depositNum + premiumNum;
   // 가격 입력 미리보기
   const pricePreview = !d.deposit ? "" :
-    isRights ? (premiumNum ? `${d.propType==="분양권"?"분양가":"권리가"} ${formatMan(d.deposit)} + P ${formatMan(d.premium)} = 총 ${formatMan(String(rightsTotal))}` : `${d.propType==="분양권"?"분양가":"권리가"} ${formatMan(d.deposit)}`) :
+    isRights ? (premiumNum ? `${rightsBaseLabel} ${formatMan(d.deposit)} + P ${formatMan(d.premium)} = 총 ${formatMan(String(rightsTotal))}` : `${rightsBaseLabel} ${formatMan(d.deposit)}`) :
+    isCommercialLease ? `보증금 ${formatMan(d.deposit)}${monthlyNum ? ` / 월 ${monthlyNum}만원` : ""}${premiumNum ? ` / 권리금 ${formatMan(d.premium)}` : ""}` :
     d.dealType === "월세" ? (monthlyNum ? `보증금 ${formatMan(d.deposit)} / 월 ${monthlyNum}만원` : `보증금 ${formatMan(d.deposit)}`) :
+    isLand ? `토지 매매가 ${formatMan(d.deposit)}` :
     formatMan(d.deposit);
-  // 수수료 산정 기준액(만원): 월세는 환산보증금, 입주권/분양권은 권리가+프리미엄
-  const feeBaseMan = isRights ? rightsTotal : (d.dealType === "월세" ? depositNum + monthlyNum * 100 : depositNum);
+  // 수수료 산정 기준액(만원): 월세/상가임대는 환산보증금, 권리성 상품은 권리가+프리미엄
+  const feeBaseMan = isRights ? rightsTotal : (isMonthlyLike ? depositNum + monthlyNum * 100 : depositNum);
   const estFeeWon = Math.round(feeBaseMan * 10000 * (d.feeRate / 100));
   // 원 → "약 OO만원 / O억 O만원"
   const wonShort = n => n >= 1e8 ? `${Math.floor(n/1e8)}억${Math.round((n%1e8)/1e4) > 0 ? ` ${Math.round((n%1e8)/1e4).toLocaleString()}만` : ""}원` : n >= 1e4 ? `${Math.round(n/1e4).toLocaleString()}만원` : `${n.toLocaleString()}원`;
@@ -226,12 +256,12 @@ function Register({ onDone, onClose, onBack }) {
     // 주소에서 "OO구" 추출 (없으면 마포구 기본)
     const regionMatch = (d.address.match(/(\S+구)/) || [])[1] || "기타";
     const dongMatch = (d.address.match(/(\S+동)/) || [])[1] || "";
-    // price 문자열: 매매/전세는 만원→억/만 표기, 월세는 "보증금/월세만", 입주권/분양권은 총액
+    // price 문자열: 매매/전세/토지는 만원→억/만 표기, 월세/상가임대는 "보증금/월세만", 권리성 상품은 총액
     const manToPrice = man => { const n=parseInt(man,10)||0; const eok=Math.floor(n/10000); const rest=n%10000; return eok>0?`${eok}억${rest>0?` ${rest.toLocaleString()}만`:""}`:`${n.toLocaleString()}만`; };
-    const priceStr = isRights ? manToPrice(String(rightsTotal)) : (d.dealType === "월세" ? `${depositNum.toLocaleString()}/${monthlyNum}만` : manToPrice(d.deposit));
+    const priceStr = isRights ? manToPrice(String(rightsTotal)) : (isMonthlyLike ? `${depositNum.toLocaleString()}/${monthlyNum}만${isCommercialLease && premiumNum ? ` 권리금 ${manToPrice(d.premium)}` : ""}` : manToPrice(d.deposit));
     // 종류 매핑 (등록은 "빌라/다세대" 등 세분 → 목록 필터용 단순화)
     const typeMap = { "아파트":"아파트", "빌라/다세대":"빌라", "단독주택":"빌라", "오피스텔":"오피스텔", "상가":"상가", "토지":"토지", "입주권":"입주권", "분양권":"분양권", "재개발·재건축":"재개발" };
-    const doneLabelMap = { "매매":"매도완료", "전세":"전세완료", "월세":"임대완료" };
+    const doneLabelMap = { "매매":"매도완료", "전세":"전세완료", "월세":"임대완료", "임대":"임대완료", "권리양도":"양도완료", "전매":"전매완료" };
     return {
       id: "u" + Date.now(),
       region: regionMatch, dong: dongMatch,
@@ -239,12 +269,12 @@ function Register({ onDone, onClose, onBack }) {
       propType: typeMap[d.propType] || "아파트",
       dealType: d.dealType,
       price: priceStr, priceNum: isRights ? rightsTotal : depositNum,
-      premium: isRights ? premiumNum : null,
+      premium: (isRights || isCommercialLease) ? premiumNum : null,
       area: parseInt(d.area, 10) || 84, floor: parseInt(d.floor, 10) || 1,
       fee: d.feeRate + "%", fast: !!d.fastMode,
       views: 0, ago: "방금 전",
       x: 50, y: 50, badge: "NEW",
-      status: "active", doneLabel: isRights ? "양도완료" : (doneLabelMap[d.dealType] || "거래완료"), completedDaysAgo: null,
+      status: "active", doneLabel: doneLabelMap[d.dealType] || "거래완료", completedDaysAgo: null,
       expiresInDays: 14, // 의뢰 기한: 기본 2주
     };
   };
@@ -252,9 +282,6 @@ function Register({ onDone, onClose, onBack }) {
   useEffect(() => {
     if (step === 10 && !submitted.current) { submitted.current = true; onDone && onDone(buildListing()); }
   }, [step]);
-  const TOTAL = 10;
-  const next = () => { setDir(1); setStep(s => s + 1); };
-  const back = () => { if (step === 0) return onBack(); setDir(-1); setStep(s => s - 1); };
   const moods = ["calm","pondering","determined","pondering","pondering","pondering","calm","pondering","determined","calm","excited"];
   const titles = ["어떤 매물인가요?","어떤 거래를 원하세요?","희망 금액을 입력하세요","매물 주소를 알려주세요","세부 정보를 입력해 주세요","임차인이 있나요?","사진을 등록해 주세요","수수료 상한을 설정하세요","의뢰 방식을 골라주세요","소유자 인증","등록 완료!"];
   const subs = ["탭하면 바로 넘어가요","탭하면 바로 넘어가요","수수료 계산의 기준이 돼요","도로명 또는 지번","중개사들이 궁금해해요","정확할수록 빠른 거래","많을수록 문의가 늘어요","높을수록 적극적으로","집주인이 직접 선택","허위매물 방지 필수","전국 중개사에게 발송!"];
@@ -276,7 +303,7 @@ function Register({ onDone, onClose, onBack }) {
           {step === 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {[["아파트","주거"],["빌라/다세대","주거"],["단독주택","주거"],["오피스텔","주거·수익"],["상가","수익형"],["토지","대지·전답"],["입주권","조합원 권리"],["분양권","청약 당첨"],["재개발·재건축","정비사업"]].map(([t, ds]) => (
-                <div key={t} onClick={() => { set("propType", t); setTimeout(next, 160); }} style={{ padding: "18px 12px", borderRadius: 18, border: `2px solid ${d.propType===t?C.green:C.line}`, background: d.propType===t?G.greenSoft:G.card, textAlign: "center", cursor: "pointer", transition: "all .15s", boxShadow: d.propType===t?"none":SH2 }}>
+                <div key={t} onClick={() => selectPropType(t)} style={{ padding: "18px 12px", borderRadius: 18, border: `2px solid ${d.propType===t?C.green:C.line}`, background: d.propType===t?G.greenSoft:G.card, textAlign: "center", cursor: "pointer", transition: "all .15s", boxShadow: d.propType===t?"none":SH2 }}>
                   <div style={{ fontSize: 15, fontWeight: d.propType===t?700:500, color: d.propType===t?C.greenInk:C.dark }}>{t}</div>
                   <div style={{ fontSize: 11, color: C.gray, marginTop: 3 }}>{ds}</div>
                 </div>
@@ -285,12 +312,13 @@ function Register({ onDone, onClose, onBack }) {
           )}
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {[["매매","소유권 이전"],["전세","보증금 일시 납부"],["월세","보증금+매월 납부"]].map(([k, ds]) => (
-                <div key={k} onClick={() => { set("dealType", k); setTimeout(next, 160); }} style={{ padding: "18px 20px", borderRadius: 18, border: `2px solid ${d.dealType===k?C.green:C.line}`, background: d.dealType===k?G.greenSoft:G.card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14, transition: "all .15s", boxShadow: d.dealType===k?"none":SH2 }}>
+              {dealOptions.map(([k, ds]) => (
+                <div key={k} onClick={() => selectDealType(k)} style={{ padding: "18px 20px", borderRadius: 18, border: `2px solid ${d.dealType===k?C.green:C.line}`, background: d.dealType===k?G.greenSoft:G.card, cursor: "pointer", display: "flex", alignItems: "center", gap: 14, transition: "all .15s", boxShadow: d.dealType===k?"none":SH2 }}>
                   <Dot color={d.dealType===k?C.green:C.line} size={12}/>
                   <div><div style={{ fontSize: 16, fontWeight: 700, color: d.dealType===k?C.greenInk:C.dark }}>{k}</div><div style={{ fontSize: 12, color: C.gray }}>{ds}</div></div>
                 </div>
               ))}
+              {!dealOptions.length && <div style={{ fontSize: 14, color: C.gray, textAlign: "center", padding: "20px 0" }}>먼저 매물 종류를 선택해 주세요</div>}
             </div>
           )}
           {step === 2 && (
@@ -298,7 +326,7 @@ function Register({ onDone, onClose, onBack }) {
               {isRights && (
                 <>
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{d.propType === "분양권" ? "분양가" : "권리가액"}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{rightsBaseLabel}</div>
                     <div style={{ position: "relative" }}>
                       <input inputMode="numeric" placeholder="예: 80000" value={d.deposit} onChange={e => set("deposit", e.target.value.replace(/[^0-9]/g, ""))} autoFocus style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
                       <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
@@ -316,12 +344,37 @@ function Register({ onDone, onClose, onBack }) {
               )}
               {!isRights && (d.dealType === "매매" || d.dealType === "전세") && (
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{d.dealType === "매매" ? "매매가" : "전세 보증금"}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{isLand ? "토지 매매가" : d.propType === "상가" && d.dealType === "매매" ? "상가 매매가" : d.dealType === "매매" ? "매매가" : "전세 보증금"}</div>
                   <div style={{ position: "relative" }}>
                     <input inputMode="numeric" placeholder="예: 125000" value={d.deposit} onChange={e => set("deposit", e.target.value.replace(/[^0-9]/g, ""))} autoFocus style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
                     <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
                   </div>
                 </div>
+              )}
+              {!isRights && isCommercialLease && (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>상가 보증금</div>
+                    <div style={{ position: "relative" }}>
+                      <input inputMode="numeric" placeholder="예: 5000" value={d.deposit} onChange={e => set("deposit", e.target.value.replace(/[^0-9]/g, ""))} autoFocus style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
+                      <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>월 임대료</div>
+                    <div style={{ position: "relative" }}>
+                      <input inputMode="numeric" placeholder="예: 250" value={d.monthly} onChange={e => set("monthly", e.target.value.replace(/[^0-9]/g, ""))} style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
+                      <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>권리금 (선택)</div>
+                    <div style={{ position: "relative" }}>
+                      <input inputMode="numeric" placeholder="예: 3000" value={d.premium} onChange={e => set("premium", e.target.value.replace(/[^0-9]/g, ""))} style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
+                      <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
+                    </div>
+                  </div>
+                </>
               )}
               {!isRights && d.dealType === "월세" && (
                 <>
@@ -343,7 +396,7 @@ function Register({ onDone, onClose, onBack }) {
               )}
               {!d.dealType && !isRights && <div style={{ fontSize: 14, color: C.gray, textAlign: "center", padding: "20px 0" }}>먼저 거래 유형을 선택해 주세요</div>}
               {pricePreview && <div style={{ background: G.greenSoft, borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: 14, color: C.greenInk, fontWeight: 700, textAlign: "center" }}>{pricePreview}</div>}
-              <Btn onClick={next} disabled={!d.deposit || (!isRights && d.dealType === "월세" && !d.monthly)}>다음</Btn>
+              <Btn onClick={next} disabled={!d.deposit || (!isRights && isMonthlyLike && !d.monthly)}>다음</Btn>
             </>
           )}
           {step === 3 && (
@@ -410,8 +463,8 @@ function Register({ onDone, onClose, onBack }) {
               </div>
               {feeBaseMan > 0 && (
                 <div style={{ background: G.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: "12px 16px", marginBottom: 14, fontSize: 12, color: C.mid, lineHeight: 1.7 }}>
-                  {d.dealType === "월세" ? `환산보증금 ${feeBaseMan.toLocaleString()}만원` : `${feeBaseMan.toLocaleString()}만원`} × {d.feeRate}% = <b style={{ color: C.greenInk }}>약 {wonShort(estFeeWon)}</b>
-                  <div style={{ color: C.gray, marginTop: 3 }}>중개사가 받을 수 있는 최대 보수예요{d.dealType === "월세" ? " · 월세는 환산보증금 기준" : ""}</div>
+                  {isMonthlyLike ? `환산보증금 ${feeBaseMan.toLocaleString()}만원` : `${feeBaseMan.toLocaleString()}만원`} × {d.feeRate}% = <b style={{ color: C.greenInk }}>약 {wonShort(estFeeWon)}</b>
+                  <div style={{ color: C.gray, marginTop: 3 }}>중개사가 받을 수 있는 최대 보수예요{isMonthlyLike ? " · 월 임대료는 환산보증금 기준" : ""}</div>
                 </div>
               )}
               <Btn onClick={next}>다음</Btn>
