@@ -1,1 +1,3 @@
-export const FROG_SPRITE = "./src/assets/toad.png";
+import toadUrl from "./assets/toad.png";
+
+export const FROG_SPRITE = toadUrl;
