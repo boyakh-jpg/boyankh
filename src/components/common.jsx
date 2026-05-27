@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { FROG_SPRITE } from "../frogSprite";
 import { C, G, SH1, SH2, spring } from "../theme";
 import { INTEREST_BROKERS, DIRECT_BUYERS } from "../data/data";
+import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
 import { feeFormula, wonText, estFee, priceChangeRate, isDone, termLabel, isExpiringSoon } from "../utils/helpers";
 
 const SW = 160, SH = 160, COLS = 4, ROWS = 4;
@@ -278,48 +280,95 @@ export function MiniMap({ items, activeId, onPick, tone = "green" }) {
   );
 }
 
-export function ListSheet({ kind, onClose }) {
+export function ListSheet({ kind, onlyNew = false, onClose }) {
   const isBroker = kind === "broker";
-  const items = isBroker ? INTEREST_BROKERS : DIRECT_BUYERS;
-  return (
-    <div style={{ position: "absolute", inset: 0, background: "#2A3A3255", zIndex: 50, display: "flex", alignItems: "flex-end", animation: "fadeIn .2s" }} onClick={onClose}>
+  const [showAll, setShowAll] = useState(false);
+  const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
+  const decisions = localDecisions && typeof localDecisions === "object" && !Array.isArray(localDecisions) ? localDecisions : {};
+  const decide = (key, value) => {
+    if (!key) return;
+    setLocalDecisions(d => {
+      const next = { ...(d && typeof d === "object" && !Array.isArray(d) ? d : {}), [key]: value };
+      saveCache(CACHE_KEYS.contactDecisions, next);
+      return next;
+    });
+  };
+  const allItems = isBroker ? INTEREST_BROKERS : DIRECT_BUYERS;
+  const items = onlyNew && !showAll ? allItems.filter(b => b.proposalNew) : allItems;
+  const title = isBroker
+    ? (onlyNew && !showAll ? `새롭게 제안한 부동산 ${items.length}곳` : `의뢰받은 부동산 ${items.length}곳`)
+    : (onlyNew && !showAll ? `새롭게 제안한 직거래 매수자 ${items.length}명` : `직거래 매수자 ${items.length}명`);
+  const showAllLabel = isBroker ? "모든 부동산 리스트보기" : "모든 직거래 매수자 리스트보기";
+  const sheet = (
+    <div style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }} onClick={onClose} onWheel={e => e.stopPropagation()}>
       <div onClick={e => e.stopPropagation()} style={{ background: G.pageBg, borderRadius: "26px 26px 0 0", width: "100%", maxHeight: "78%", overflowY: "auto", padding: "20px 18px 28px", boxSizing: "border-box", animation: "sheetUp .3s " + spring }}>
         <div style={{ width: 40, height: 4, borderRadius: 2, background: C.line, margin: "0 auto 16px" }}/>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <Frog mood={isBroker ? "excited" : "love"} size={48}/>
-          <div><div style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>{isBroker ? `제안한 부동산 ${items.length}곳` : `직거래 문의 ${items.length}건`}</div><div style={{ fontSize: 12, color: C.gray }}>{isBroker ? "내 매물에 중개 제안을 보낸 부동산이에요" : "직거래는 중개수수료가 없어요"}</div></div>
+          <div><div style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>{title}</div><div style={{ fontSize: 12, color: C.gray }}>{isBroker ? "내 의뢰에 중개 제안을 보낸 부동산이에요" : "내 물건을 열람하거나 안심의뢰한 매수자예요"}</div></div>
         </div>
+        {onlyNew && !showAll && <button onClick={() => setShowAll(true)} style={{ width: "100%", border: `1.5px solid ${C.green}`, background: "#fff", color: C.greenInk, borderRadius: 14, padding: "10px 0", marginBottom: 12, fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>{showAllLabel}</button>}
         {isBroker ? items.map((b, i) => (
-          <BrokerOfficeCard key={i} broker={b} actionLabel="전화 / 문자 연결"/>
-        )) : items.map((b, i) => (
-          <div key={i} style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{b.name}</div><div style={{ fontSize: 11, color: C.gray }}>{b.when}</div></div>
-            <div style={{ fontSize: 13, color: C.mid, marginBottom: 4 }}>{b.note}</div>
-            <div style={{ fontSize: 12, color: C.goldInk, fontWeight: 700, marginBottom: 10 }}>희망 예산: {b.budget}</div>
-            <button style={{ width: "100%", padding: "11px 0", background: G.gold, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>직거래 채팅하기 (중개수수료 0)</button>
-          </div>
-        ))}
+          <BrokerOfficeCard key={i} broker={b} compact actionLabel="전화 / 문자 연결" decision={b.chatId ? decisions[b.chatId] : null} onApprove={b.chatId ? () => decide(b.chatId, "approved") : null} onReject={b.chatId ? () => decide(b.chatId, "rejected") : null}/>
+        )) : items.map((b, i) => {
+          const canDecide = b.activityType === "안심의뢰" && b.chatId;
+          const decisionKey = b.requestId || b.chatId;
+          const decision = canDecide ? decisions[decisionKey] : null;
+          return (
+            <div key={i} style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{b.name}</div><div style={{ fontSize: 11, color: C.gray }}>{b.when}</div></div>
+              <div style={{ display: "inline-flex", background: b.activityType === "안심의뢰" ? G.greenSoft : G.goldSoft, color: b.activityType === "안심의뢰" ? C.greenInk : C.goldInk, borderRadius: 10, padding: "3px 8px", fontSize: 11, fontWeight: 900, marginBottom: 7 }}>{b.activityType}</div>
+              {b.listingTitle && <div style={{ background: G.goldSoft, borderRadius: 11, padding: "8px 10px", fontSize: 12, color: C.goldInk, fontWeight: 900, marginBottom: 8 }}>응답 매물: {b.listingTitle}</div>}
+              <div style={{ fontSize: 13, color: C.mid, marginBottom: 4 }}>{b.note}</div>
+              <div style={{ fontSize: 12, color: C.goldInk, fontWeight: 700, marginBottom: 10 }}>희망 예산: {b.budget}</div>
+              {canDecide && (
+                decision ? (
+                  <div style={{ background: decision === "approved" ? G.greenSoft : "#F2F4F3", border: `1px solid ${decision === "approved" ? C.green : C.line}`, color: decision === "approved" ? C.greenInk : C.gray, borderRadius: 12, padding: "10px 12px", fontSize: 13, fontWeight: 900, textAlign: "center", marginBottom: 8 }}>{decision === "approved" ? "연락처 공개 승인됨" : "연락처 공개 거절됨"}</div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <button onClick={e => { e.stopPropagation(); decide(decisionKey, "approved"); }} style={{ border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>승인</button>
+                    <button onClick={e => { e.stopPropagation(); decide(decisionKey, "rejected"); }} style={{ border: `1.5px solid ${C.line}`, background: "#fff", color: C.gray, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>거절</button>
+                  </div>
+                )
+              )}
+              <button style={{ width: "100%", padding: "11px 0", background: G.gold, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>직거래 채팅하기 (중개수수료 0)</button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
+  return typeof document === "undefined" ? sheet : createPortal(sheet, document.body);
 }
 
-export function BrokerOfficeCard({ broker, actionLabel = "제안 확인하기", onClick }) {
+export function BrokerOfficeCard({ broker, actionLabel = "제안 확인하기", onClick, decision = null, onApprove, onReject, compact = false }) {
   const modeLabel = { chat: "채팅 가능", call: "전화 위주", sms: "문자 위주", none: "응답 안 함" }[broker.responseMode] || "상담 방식 미정";
+  const canDecide = !!(onApprove && onReject);
   return (
-    <div style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2, border: `1px solid ${C.greenSoft}` }}>
+    <div style={{ background: G.card, borderRadius: 18, padding: compact ? 14 : 16, marginBottom: 10, boxShadow: SH2, border: `1px solid ${C.greenSoft}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
         <div>
           <div style={{ fontSize: 11, color: C.greenInk, fontWeight: 800, marginBottom: 3 }}>{broker.tier || "검증 부동산"}</div>
           <div style={{ fontSize: 14, fontWeight: 800, color: C.dark }}>{broker.office || broker.officeName}</div>
           <div style={{ fontSize: 12, color: C.gray }}>{broker.name || broker.agentName} 공인중개사 · {modeLabel}</div>
         </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
+        {!compact && <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: C.goldInk }}>{broker.region} 상위 {broker.percentileInRegion}%</div>
           <div style={{ fontSize: 11, color: C.gray }}>계약 {broker.deals || broker.verifiedDeals12m}건 · 리뷰 {broker.reviewCount}개</div>
-        </div>
+        </div>}
       </div>
-      <div style={{ background: G.greenSoft, borderRadius: 12, padding: "10px 12px", fontSize: 13, color: C.mid, marginBottom: 10, lineHeight: 1.5 }}>"{broker.msg || broker.proposalMessage}"</div>
+      {!compact && <div style={{ background: G.greenSoft, borderRadius: 12, padding: "10px 12px", fontSize: 13, color: C.mid, marginBottom: 10, lineHeight: 1.5 }}>"{broker.msg || broker.proposalMessage}"</div>}
+      {broker.listingTitle && <div style={{ background: G.goldSoft, borderRadius: 11, padding: "8px 10px", fontSize: 12, color: C.goldInk, fontWeight: 900, marginBottom: 10 }}>응답 매물: {broker.listingTitle}</div>}
+      {canDecide && (
+        decision ? (
+          <div style={{ background: decision === "approved" ? G.greenSoft : "#F2F4F3", border: `1px solid ${decision === "approved" ? C.green : C.line}`, color: decision === "approved" ? C.greenInk : C.gray, borderRadius: 12, padding: "10px 12px", fontSize: 13, fontWeight: 900, textAlign: "center", marginBottom: 8 }}>{decision === "approved" ? "연락처 공개 승인됨" : "연락처 공개 거절됨"}</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <button onClick={e => { e.stopPropagation(); onApprove(); }} style={{ border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>승인</button>
+            <button onClick={e => { e.stopPropagation(); onReject(); }} style={{ border: `1.5px solid ${C.line}`, background: "#fff", color: C.gray, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>거절</button>
+          </div>
+        )
+      )}
       <button onClick={onClick} style={{ width: "100%", padding: "11px 0", background: G.header, border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{actionLabel}</button>
     </div>
   );

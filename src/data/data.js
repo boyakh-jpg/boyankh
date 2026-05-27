@@ -257,16 +257,27 @@ export const BROKER_OFFICES = [
   },
 ];
 
+export const OWNER_DEMO_ACTIVE_COUNT = 2;
+export const PROPOSAL_CHAT_IDS = { bo1: "c1", bo2: "c5", bo3: "c6", bo4: "c2" };
+const PROPOSAL_LISTING_TITLES = {
+  bo1: "마포구 공덕동 래미안5차 · 84㎡",
+  bo2: "마포구 공덕동 래미안5차 · 84㎡",
+  bo3: "마포구 공덕동 래미안5차 · 84㎡",
+  bo4: "송파구 잠실동 리센츠 · 59㎡",
+};
 export const INTEREST_BROKERS = BROKER_OFFICES.slice(0, 4).map(o => ({
   ...o,
   name: o.agentName,
   office: o.officeName,
   deals: o.verifiedDeals12m,
   msg: o.proposalMessage,
+  listingTitle: PROPOSAL_LISTING_TITLES[o.id],
+  proposalNew: ["bo1", "bo4"].includes(o.id),
+  chatId: PROPOSAL_CHAT_IDS[o.id] || null,
 }));
 export const DIRECT_BUYERS = [
-  { name: "익명 매수자 A", note: "실거주 목적, 대출 사전심사 완료", when: "2시간 전", budget: "12억대 가능" },
-  { name: "익명 매수자 B", note: "투자 목적, 현금 보유", when: "어제", budget: "13억까지" },
+  { name: "익명 매수자 A", note: "실거주 목적, 대출 사전심사 완료", when: "2시간 전", budget: "12억대 가능", activityType: "안심의뢰", proposalNew: true, requestId: "direct-safe-1", chatId: "c3", listingTitle: "마포구 공덕동 래미안5차 · 84㎡" },
+  { name: "익명 매수자 B", note: "투자 목적, 현금 보유", when: "어제", budget: "13억까지", activityType: "열람", proposalNew: false, listingTitle: "송파구 잠실동 리센츠 · 59㎡" },
 ];
 
 export const CHATS = [
@@ -282,12 +293,22 @@ export const CHATS = [
       { from: "broker", text: "관심 있습니다. 편하실 때 연락 부탁드려요!", time: "오전 11:02", isDefault: true },
       { from: "me", text: "전세 만기가 9월이라 그 전에 계약 원해요.", time: "오전 11:30" },
     ] },
+  { id: "c5", name: "이수연 공인중개사", office: "공덕 부동산플러스", property: "마포구 공덕동 래미안5차 · 84㎡", unread: 0, mode: "안심의뢰",
+    messages: [
+      { from: "broker", text: "실거주 매수 대기 고객을 보유 중이에요. 연락처 공개를 요청드립니다.", time: "오전 10:12", isDefault: true },
+      { from: "me", text: "제안 내용 확인해볼게요.", time: "오전 10:18" },
+    ] },
+  { id: "c6", name: "박지훈 공인중개사", office: "마포 한강공인중개사", property: "마포구 공덕동 래미안5차 · 84㎡", unread: 0, mode: "안심의뢰",
+    messages: [
+      { from: "broker", text: "상가와 아파트 수요층을 나눠 제안드릴 수 있어요. 연락처 공개를 요청드립니다.", time: "어제 오후 4:05", isDefault: true },
+      { from: "me", text: "제안 감사합니다. 검토 후 답드릴게요.", time: "어제 오후 4:20" },
+    ] },
   { id: "c4", name: "박지훈 공인중개사", office: "마포 한강공인중개사", property: "마포구 공덕동 래미안5차 · 84㎡", unread: 0, mode: "빠른의뢰",
     messages: [
       { from: "broker", text: "연락처 확인했습니다. 바로 통화드리고 방문 일정 잡겠습니다.", time: "오후 3:10" },
       { from: "me", text: "네, 문자로 가능한 시간 먼저 보내주세요.", time: "오후 3:12" },
     ] },
-  { id: "c3", name: "익명 매수자 A", office: "직거래 문의", property: "마포구 공덕동 래미안5차 · 84㎡", unread: 1, mode: "직거래",
+  { id: "c3", contactRequestId: "direct-safe-1", name: "익명 매수자 A", office: "직거래 문의", property: "마포구 공덕동 래미안5차 · 84㎡", unread: 1, mode: "직거래",
     messages: [
       { from: "broker", text: "실거주 목적입니다. 대출 사전심사 완료했어요.", time: "오후 5:40" },
     ] },

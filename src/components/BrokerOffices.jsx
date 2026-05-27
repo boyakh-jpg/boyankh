@@ -1,6 +1,7 @@
 ﻿import { useState } from "react";
 import { C, G, SH1, SH2 } from "../theme";
-import { BROKER_OFFICES, REGIONS } from "../data/data";
+import { BROKER_OFFICES, REGIONS, PROPOSAL_CHAT_IDS } from "../data/data";
+import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
 import { BrokerOfficeCard, SelectBox, Frog, RoleToggle, Tag } from "./common";
 
 const responseModeLabel = {
@@ -76,6 +77,16 @@ function OfficeDetail({ office, contracted, onContract, onClose }) {
 }
 
 export function BrokerOffices({ role = "owner", availableRoles, preferredRegion = "전체", interestRegion = "전체", onSwitchRole }) {
+  const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
+  const decisions = localDecisions && typeof localDecisions === "object" && !Array.isArray(localDecisions) ? localDecisions : {};
+  const decide = (key, value) => {
+    if (!key) return;
+    setLocalDecisions(d => {
+      const next = { ...(d && typeof d === "object" && !Array.isArray(d) ? d : {}), [key]: value };
+      saveCache(CACHE_KEYS.contactDecisions, next);
+      return next;
+    });
+  };
   const [sido, setSido] = useState("서울특별시");
   const initialRegions = Array.from(new Set([preferredRegion, interestRegion].filter(r => r && r !== "전체")));
   const [regionGroup, setRegionGroup] = useState(initialRegions);
@@ -131,9 +142,20 @@ export function BrokerOffices({ role = "owner", availableRoles, preferredRegion 
           </div>
         </div>
         <div style={{ fontSize: 13, color: C.gray, marginBottom: 10 }}>총 {list.length}곳{regionGroup.length > 0 && ` · ${regionGroup.join("·")}`}</div>
-        {list.map(o => (
-          <BrokerOfficeCard key={o.id} broker={o} actionLabel="상세 보기" onClick={() => setSelected(o.id)}/>
-        ))}
+        {list.map(o => {
+          const chatId = PROPOSAL_CHAT_IDS[o.id];
+          return (
+            <BrokerOfficeCard
+              key={o.id}
+              broker={o}
+              actionLabel="상세 보기"
+              onClick={() => setSelected(o.id)}
+              decision={chatId ? decisions[chatId] : null}
+              onApprove={chatId ? () => decide(chatId, "approved") : null}
+              onReject={chatId ? () => decide(chatId, "rejected") : null}
+            />
+          );
+        })}
         <div style={{ height: 64 }}/>
       </div>
     </div>

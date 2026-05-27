@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { C, G, SH1, SH2 } from "../theme";
 import { CHATS } from "../data/data";
+import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
 import { RoleToggle, Frog, Tag } from "./common";
 
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
@@ -38,9 +39,13 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
 
 export function ChatRoom({ chatId, role, onBack }) {
   const chat = CHATS.find(c => c.id === chatId) || CHATS[0];
+  const decisionKey = chat.contactRequestId || chat.id;
   const [msgs, setMsgs] = useState(chat.messages);
   const [input, setInput] = useState("");
-  const [contactDecision, setContactDecision] = useState(null);
+  const [localContactDecision, setLocalContactDecision] = useState(() => {
+    const cached = loadCache(CACHE_KEYS.contactDecisions, {});
+    return cached && typeof cached === "object" && !Array.isArray(cached) ? cached[decisionKey] || null : null;
+  });
   const listRef = useRef(null);
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
@@ -58,8 +63,15 @@ export function ChatRoom({ chatId, role, onBack }) {
   const isFast = chat.mode === "빠른의뢰";
   const needsContactApproval = !isFast;
   const canApproveContact = role === "owner";
+  const contactDecision = localContactDecision;
   const decideContact = approved => {
-    setContactDecision(approved ? "approved" : "rejected");
+    const nextDecision = approved ? "approved" : "rejected";
+    setLocalContactDecision(nextDecision);
+    const cached = loadCache(CACHE_KEYS.contactDecisions, {});
+    saveCache(CACHE_KEYS.contactDecisions, {
+      ...(cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {}),
+      [decisionKey]: nextDecision,
+    });
     const now = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
     setMsgs(m => [...m, {
       from: "broker",

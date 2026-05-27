@@ -44,7 +44,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const [chargeOpen, setChargeOpen] = useState(false);
   const [hideViewed, setHideViewed] = useState(true);
   const [sido, setSido] = useState("서울특별시");
-  const [regionGroup, setRegionGroup] = useState(Array.isArray(preset.regions) ? preset.regions : []);
+  const [regionGroup, setRegionGroup] = useState([]);
   const [region, setRegion] = useState(preset.region || "전체");
   const [dong, setDong] = useState("전체");
   const [ptypes, setPtypes] = useState(Array.isArray(preset.ptypes) ? preset.ptypes : (preset.ptype && preset.ptype !== "전체" ? [preset.ptype] : []));
@@ -64,8 +64,8 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2000); };
   const markViewed = id => setViewed(v => v[id] ? v : ({ ...v, [id]: "방금" }));
   const toggleFavorite = id => setFavorites(v => ({ ...v, [id]: !v[id] }));
-  const matchesPresetRegion = p => region === "전체" ? (!regionGroup.length || regionGroup.includes(p.region)) : p.region === region;
-  const matchesAppliedRegion = p => appliedFilters.region === "전체" ? (!appliedFilters.regionGroup.length || appliedFilters.regionGroup.includes(p.region)) : p.region === appliedFilters.region;
+  const matchesPresetRegion = p => region === "전체" ? true : p.region === region;
+  const matchesAppliedRegion = p => appliedFilters.region === "전체" ? true : p.region === appliedFilters.region;
   const dongOptions = ["전체", ...Array.from(new Set(properties.filter(p => matchesPresetRegion(p)).map(p => p.dong))).sort()];
   const ptypeOptions = PROP_TYPES.filter(o => o !== "전체");
   const dealOptionsFor = nextPtypes => Array.from(new Set((nextPtypes.length ? nextPtypes : ["전체"]).flatMap(t => DEAL_TYPES_BY_PROP[t] || []))).filter(o => o !== "전체");
@@ -127,8 +127,8 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   else if (appliedFilters.sort === "추이 하락순") list = [...list].sort((a, b) => priceChangeRate(a) - priceChangeRate(b));
   const activePin = activeId && list.some(p => p.id === activeId) ? activeId : null;
   const visibleList = list;
-  const hasFilter = appliedFilters.regionGroup.length > 0 || appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
-  const hasPendingFilters = appliedFilters.region !== region || appliedFilters.dong !== dong || appliedFilters.sort !== sort || appliedFilters.statusFilter !== statusFilter || appliedFilters.hideViewed !== hideViewed || appliedFilters.listMode !== listMode || !sameValues(appliedFilters.regionGroup, regionGroup) || !sameValues(appliedFilters.ptypes, ptypes) || !sameValues(appliedFilters.dealTypes, dealTypes);
+  const hasFilter = appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
+  const hasPendingFilters = appliedFilters.region !== region || appliedFilters.dong !== dong || appliedFilters.sort !== sort || appliedFilters.statusFilter !== statusFilter || appliedFilters.hideViewed !== hideViewed || appliedFilters.listMode !== listMode || !sameValues(appliedFilters.ptypes, ptypes) || !sameValues(appliedFilters.dealTypes, dealTypes);
   const applyFilters = () => {
     setAppliedFilters({ regionGroup: [...regionGroup], region, dong, ptypes: [...ptypes], dealTypes: [...dealTypes], sort, statusFilter, hideViewed, listMode });
     setActiveId(null);

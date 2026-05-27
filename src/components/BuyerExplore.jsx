@@ -38,7 +38,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   const [hideViewed, setHideViewed] = useState(true);
   const maxListPrice = Math.ceil(Math.max(...properties.map(p => p.priceNum || 0), 100000) / 10000) * 10000;
   const [sido, setSido] = useState("서울특별시");
-  const [regionGroup, setRegionGroup] = useState(Array.isArray(preset.regions) ? preset.regions : []);
+  const [regionGroup, setRegionGroup] = useState([]);
   const [region, setRegion] = useState(preset.region || "전체");
   const [dong, setDong] = useState("전체");
   const [ptypes, setPtypes] = useState(Array.isArray(preset.ptypes) ? preset.ptypes : (preset.ptype && preset.ptype !== "전체" ? [preset.ptype] : []));
@@ -63,8 +63,8 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   const toggleFavorite = id => setFavorites(v => ({ ...v, [id]: !v[id] }));
   const chargeOptions = [10000, 30000, 50000, 100000];
   const buyerBonusRate = amount => amount >= 100000 ? 0.1 : amount >= 50000 ? 0.05 : amount >= 30000 ? 0.03 : 0;
-  const matchesPresetRegion = p => region === "전체" ? (!regionGroup.length || regionGroup.includes(p.region)) : p.region === region;
-  const matchesAppliedRegion = p => appliedFilters.region === "전체" ? (!appliedFilters.regionGroup.length || appliedFilters.regionGroup.includes(p.region)) : p.region === appliedFilters.region;
+  const matchesPresetRegion = p => region === "전체" ? true : p.region === region;
+  const matchesAppliedRegion = p => appliedFilters.region === "전체" ? true : p.region === appliedFilters.region;
   const dongOptions = ["전체", ...Array.from(new Set(properties.filter(p => matchesPresetRegion(p)).map(p => p.dong))).sort()];
   const ptypeOptions = PROP_TYPES.filter(o => o !== "전체");
   const dealOptionsFor = nextPtypes => Array.from(new Set((nextPtypes.length ? nextPtypes : ["전체"]).flatMap(t => DEAL_TYPES_BY_PROP[t] || []))).filter(o => o !== "전체");
@@ -120,8 +120,8 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   else if (appliedFilters.sort === "추이 하락순") list = [...list].sort((a, b) => priceChangeRate(a) - priceChangeRate(b));
   const activePin = activeId && list.some(p => p.id === activeId) ? activeId : null;
   const visibleList = list;
-  const hasFilter = appliedFilters.regionGroup.length > 0 || appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.priceMin > 0 || appliedFilters.priceMax < maxListPrice || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
-  const hasPendingFilters = appliedFilters.region !== region || appliedFilters.dong !== dong || appliedFilters.priceMin !== priceMin || appliedFilters.priceMax !== priceMax || appliedFilters.sort !== sort || appliedFilters.statusFilter !== statusFilter || appliedFilters.hideViewed !== hideViewed || appliedFilters.listMode !== listMode || !sameValues(appliedFilters.regionGroup, regionGroup) || !sameValues(appliedFilters.ptypes, ptypes) || !sameValues(appliedFilters.dealTypes, dealTypes);
+  const hasFilter = appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.priceMin > 0 || appliedFilters.priceMax < maxListPrice || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
+  const hasPendingFilters = appliedFilters.region !== region || appliedFilters.dong !== dong || appliedFilters.priceMin !== priceMin || appliedFilters.priceMax !== priceMax || appliedFilters.sort !== sort || appliedFilters.statusFilter !== statusFilter || appliedFilters.hideViewed !== hideViewed || appliedFilters.listMode !== listMode || !sameValues(appliedFilters.ptypes, ptypes) || !sameValues(appliedFilters.dealTypes, dealTypes);
   const applyFilters = () => {
     setAppliedFilters({ regionGroup: [...regionGroup], region, dong, ptypes: [...ptypes], dealTypes: [...dealTypes], priceMin, priceMax, sort, statusFilter, hideViewed, listMode });
     setActiveId(null);

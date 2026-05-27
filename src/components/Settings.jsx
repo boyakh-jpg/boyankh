@@ -66,7 +66,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
           <SelectBox label="기본 지역" value={preferredRegion} options={regionOptions} onChange={onRegionChange}/>
           <div style={{ height: 8 }}/>
           <SelectBox label="관심 지역" value={interestRegion} options={regionOptions} onChange={onInterestRegionChange}/>
-          <div style={{ marginTop: 10, fontSize: 12, color: C.gray, lineHeight: 1.6 }}>두 지역 기준으로 홈 추천 매물, 부동산, 신규 매물, 만료 임박이 바뀌어요. 이 브라우저에 저장돼요.</div>
+          <div style={{ marginTop: 10, fontSize: 12, color: C.gray, lineHeight: 1.6 }}>기본 지역은 매물목록 지도와 지역 필터의 첫 선택값이에요. 관심 지역은 기본 지역과 함께 홈 추천 매물, 부동산, 신규 매물, 만료 임박에 반영돼요. 이 브라우저에 저장돼요.</div>
         </Section>
         <Section title="알림">
           {NOTIFICATION_LABELS.map(([key, title, sub]) => (
@@ -75,10 +75,10 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
         </Section>
         {role === "broker" && (
           <Section title="중개사 설정">
-            <div style={{ background: G.greenSoft, borderRadius: 14, padding: 14, marginBottom: 10 }}>
-              <div style={{ fontSize: 14, color: C.greenInk, fontWeight: 900 }}>구독 등급 · {brokerTier}</div>
-              <div style={{ fontSize: 12, color: C.mid, lineHeight: 1.6, marginTop: 4 }}>알림 우선권, 충전 보너스, 조회 한도를 여기서 관리해요.</div>
-              <button onClick={onSubscription} style={{ width: "100%", marginTop: 10, border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>구독 관리</button>
+            <div style={{ background: G.greenSoft, borderRadius: 14, padding: "13px 14px 14px", marginBottom: 10 }}>
+              <div style={{ fontSize: 14, lineHeight: 1.35, color: C.greenInk, fontWeight: 800 }}>구독 등급 · {brokerTier}</div>
+              <div style={{ fontSize: 12, color: C.mid, lineHeight: 1.5, marginTop: 3 }}>알림 우선권, 충전 보너스, 조회 한도를 여기서 관리해요.</div>
+              <button onClick={onSubscription} style={{ width: "100%", marginTop: 10, border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "10px 0", fontSize: 13, lineHeight: 1.25, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>구독 관리</button>
             </div>
             <MenuRow title="부동산 정보" sub="상호, 등록번호, 사무소 주소" tag="필수"/>
             <MenuRow title="영업시간" sub="응답률 계산에 반영될 시간"/>

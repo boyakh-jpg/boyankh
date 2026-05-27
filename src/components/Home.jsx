@@ -1,7 +1,7 @@
 ﻿import { useState } from "react";
 import { C, G, SH1 } from "../theme";
 import { Frog, RoleToggle, StatCard, ListSheet, BrokerOfficeCard, FeeEstimate, PriceTrend, PriceHistoryPanel, DoneBadge, Tag } from "./common";
-import { PROPERTIES, BROKER_OFFICES, DIRECT_BUYERS } from "../data/data";
+import { PROPERTIES, BROKER_OFFICES, DIRECT_BUYERS, INTEREST_BROKERS, OWNER_DEMO_ACTIVE_COUNT } from "../data/data";
 import { estFee, isDone, isExpiringSoon, isNewListing, priceChangeRate, termLabel } from "../utils/helpers";
 
 function Header({ role, availableRoles, title, subtitle, mood, onSwitchRole, actionLabel, onAction }) {
@@ -39,19 +39,35 @@ function BrokerPlanIntro({ tier, bonus, onClick }) {
   );
 }
 
+function SectionTitle({ title, actionLabel, actionColor = C.greenInk, onAction }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "18px 0 10px" }}>
+      <div style={{ fontSize: 15, fontWeight: 900, color: C.dark }}>{title}</div>
+      {onAction && <button onClick={onAction} style={{ background: "none", border: "none", color: actionColor, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{actionLabel}</button>}
+    </div>
+  );
+}
+
 function TaskList({ items }) {
+  const [checked, setChecked] = useState({});
   return (
     <div style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: SH1 }}>
       <div style={{ fontSize: 15, fontWeight: 900, color: C.dark, marginBottom: 12 }}>오늘 확인할 일</div>
-      {items.map(([title, sub, action]) => (
-        <button key={title} onClick={action} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#fff", border: `1px solid ${C.line}`, borderRadius: 14, padding: "12px 13px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
-          <span>
+      {items.map(([title, sub, action]) => {
+        const done = !!checked[title];
+        return (
+        <button key={title} onClick={() => { setChecked(c => ({ ...c, [title]: true })); action && action(); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: done ? G.greenSoft : "#fff", border: `1.5px solid ${done ? C.green : C.line}`, borderRadius: 14, padding: "12px 13px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+          <span style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>
+            {done && <span style={{ width: 20, height: 20, borderRadius: 10, background: G.header, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, flexShrink: 0 }}>✓</span>}
+            <span style={{ minWidth: 0 }}>
             <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: C.dark }}>{title}</span>
             <span style={{ display: "block", fontSize: 12, color: C.gray, marginTop: 2 }}>{sub}</span>
+            </span>
           </span>
           <span style={{ color: C.greenInk, fontWeight: 900 }}>›</span>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -116,7 +132,6 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   const [sheet, setSheet] = useState(null);
   const [detail, setDetail] = useState(null);
   const targetRegions = Array.from(new Set([preferredRegion, interestRegion].filter(Boolean)));
-  const targetLabel = targetRegions.join("·");
   const officeTierScore = office => {
     const tier = office.tier || "";
     const tierPoint = tier.includes("대표") ? 4 : tier.includes("파워") ? 3 : tier.includes("우수") ? 2 : 1;
@@ -126,24 +141,38 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   const activeListings = properties.filter(p => !isDone(p));
   const localListings = activeListings.filter(p => targetRegions.includes(p.region));
   const recommendedListings = localListings.length ? localListings : activeListings;
-  const localPreset = localListings.length ? { regions: targetRegions } : {};
-  const localLabel = localListings.length ? targetLabel : "전체 지역";
+  const localPreset = preferredRegion ? { region: preferredRegion } : {};
+  const baseLabel = preferredRegion || "전체 지역";
+  const baseListings = preferredRegion ? activeListings.filter(p => p.region === preferredRegion) : activeListings;
+  const interestListings = interestRegion ? activeListings.filter(p => p.region === interestRegion) : [];
   const newCount = recommendedListings.filter(isNewListing).length;
   const expiringCount = recommendedListings.filter(isExpiringSoon).length;
   const priceDownCount = recommendedListings.filter(p => priceChangeRate(p) < -0.1).length;
   const brokerBonus = { 무료: 0, 실버: 5, 골드: 10 }[brokerTier] || 0;
   const ownerListings = properties.filter(p => p.mine);
+  const newBrokerProposals = INTEREST_BROKERS.filter(b => b.proposalNew);
+  const newDirectBuyers = DIRECT_BUYERS.filter(b => b.proposalNew);
   const ownerSummary = (ownerListings.length ? ownerListings : properties.slice(8, 10)).slice(0, 2);
-  const ownerActiveCount = ownerListings.length ? ownerListings.filter(p => !isDone(p)).length : ownerSummary.filter(p => !isDone(p)).length;
+  const ownerActiveCount = OWNER_DEMO_ACTIVE_COUNT + ownerListings.filter(p => !isDone(p)).length;
   const localOffices = BROKER_OFFICES.filter(b => b.specialtyRegions?.some(r => targetRegions.includes(r)));
   const topLocalOffices = localOffices.filter(b => (b.percentileInRegion || 100) <= 30);
   const officePool = topLocalOffices.length ? topLocalOffices : (localOffices.length ? localOffices : BROKER_OFFICES);
   const ownerOffices = [...officePool].sort((a, b) => officeTierScore(b) - officeTierScore(a));
-  const officeLabel = localOffices.length ? targetLabel : "전체 지역";
   const brokerScore = p => estFee(p) / 10000 + (p.views || 0) * 10;
   const buyerScore = p => Math.max(0, -priceChangeRate(p)) * 100 + (p.views || 0) * 5;
-  const brokerSummary = [...recommendedListings].sort((a, b) => brokerScore(b) - brokerScore(a)).slice(0, 2);
-  const buyerSummary = [...recommendedListings].sort((a, b) => buyerScore(b) - buyerScore(a)).slice(0, 2);
+  const hasInterestSection = interestRegion && interestRegion !== preferredRegion;
+  const listingsByRegion = region => {
+    const pool = region ? activeListings.filter(p => p.region === region) : activeListings;
+    return pool.length ? pool : [];
+  };
+  const rankedListings = (region, scoreFn) => [...listingsByRegion(region)].sort((a, b) => scoreFn(b) - scoreFn(a)).slice(0, 2);
+  const brokerBaseSummary = rankedListings(preferredRegion, brokerScore);
+  const brokerInterestSummary = hasInterestSection ? rankedListings(interestRegion, brokerScore) : [];
+  const buyerBaseSummary = rankedListings(preferredRegion, buyerScore);
+  const buyerInterestSummary = hasInterestSection ? rankedListings(interestRegion, buyerScore) : [];
+  const officesByRegion = region => BROKER_OFFICES.filter(b => b.specialtyRegions?.includes(region)).sort((a, b) => officeTierScore(b) - officeTierScore(a)).slice(0, 2);
+  const baseOffices = officesByRegion(preferredRegion);
+  const interestOffices = hasInterestSection ? officesByRegion(interestRegion) : [];
 
   if (role === "broker") {
     return (
@@ -152,21 +181,22 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
         <Header role={role} availableRoles={availableRoles} title="공인중개사 홈" subtitle="중개 매물이 있어요" mood="smug" onSwitchRole={onSwitchRole} actionLabel="매물 보기" onAction={() => onBrokerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <StatCard value={recommendedListings.length + "건"} label={`${localLabel} 매물`} tone="green" onClick={() => onBrokerList(localPreset)}/>
-            <StatCard value={newCount + "건"} label="3일 신규" tone="green" onClick={() => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
-            <StatCard value={expiringCount + "건"} label="만료 임박" tone="gold" onClick={() => onBrokerList({ ...localPreset, statusFilter: "만료 임박" })}/>
+            <StatCard value={baseListings.length + "건"} label="기본지역 매물" tone="green" onClick={() => onBrokerList({ region: preferredRegion })}/>
+            <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="green" onClick={() => onBrokerList({ region: interestRegion })}/>
+            <StatCard value={newCount + "건"} label="3일 신규매물" tone="gold" onClick={() => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
           </div>
           <BrokerPlanIntro tier={brokerTier} bonus={brokerBonus} onClick={onSubscription}/>
           <TaskList items={[
-            ["수수료 높은 매물", `${localLabel} 예상 중개보수 기준으로 우선 확인`, () => onBrokerList({ ...localPreset, sort: "수수료높은순" })],
-            ["신규 의뢰", `${localLabel} 최근 3일 안에 올라온 의뢰`, () => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
-            ["만료 임박", `${localLabel} ${expiringCount}건은 빠르게 제안해야 해요`, () => onBrokerList({ ...localPreset, statusFilter: "만료 임박" })],
+            ["수수료 높은 매물", `${baseLabel} 예상 중개보수 기준으로 우선 확인`, () => onBrokerList({ ...localPreset, sort: "수수료높은순" })],
+            ["신규 의뢰", `${baseLabel} 최근 3일 안에 올라온 의뢰`, () => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
+            ["만료 임박", `${baseLabel} ${expiringCount}건은 빠르게 제안해야 해요`, () => onBrokerList({ ...localPreset, statusFilter: "만료 임박" })],
           ]}/>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: C.dark }}>{localLabel} 추천 매물</div>
-            <button onClick={() => onBrokerList(localPreset)} style={{ background: "none", border: "none", color: C.greenInk, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>매물로 이동</button>
-          </div>
-          {brokerSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => setDetail({ listing: l, tone: l.fast ? "gold" : "green" })} showFee/>)}
+          <SectionTitle title="기본지역 추천 매물" actionLabel="기본지역 매물로 이동" onAction={() => onBrokerList({ region: preferredRegion })}/>
+          {brokerBaseSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => setDetail({ listing: l, tone: l.fast ? "gold" : "green" })} showFee/>)}
+          {hasInterestSection && <>
+            <SectionTitle title="관심지역 추천 매물" actionLabel="관심지역 매물로 이동" onAction={() => onBrokerList({ region: interestRegion })}/>
+            {brokerInterestSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => setDetail({ listing: l, tone: l.fast ? "gold" : "green" })} showFee/>)}
+          </>}
           <div style={{ height: 64 }}/>
         </div>
       </div>
@@ -180,20 +210,21 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
         <Header role={role} availableRoles={availableRoles} title="직거래 홈" subtitle="쉽게 집을 찾아요" mood="cool" onSwitchRole={onSwitchRole} actionLabel="직거래 매물 보기" onAction={() => onBuyerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <StatCard value={recommendedListings.length + "건"} label={`${localLabel} 매물`} tone="gold" onClick={() => onBuyerList(localPreset)}/>
-            <StatCard value={newCount + "건"} label="3일 신규" tone="green" onClick={() => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
-            <StatCard value="10,000P" label="열람 비용" tone="gold" onClick={() => onBuyerList()}/>
+            <StatCard value={baseListings.length + "건"} label="기본지역 매물" tone="gold" onClick={() => onBuyerList({ region: preferredRegion })}/>
+            <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="gold" onClick={() => onBuyerList({ region: interestRegion })}/>
+            <StatCard value={newCount + "건"} label="3일 신규매물" tone="green" onClick={() => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
           </div>
           <TaskList items={[
-            ["신규 매물", `${localLabel} 최근 3일 안에 올라온 매물`, () => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
-            ["가격 인하 매물", `${localLabel} ${priceDownCount}건은 가격이 내려갔어요`, () => onBuyerList({ ...localPreset, sort: "추이 하락순" })],
-            ["인기 매물", `${localLabel} 열람이 많은 직거래 매물`, () => onBuyerList({ ...localPreset, sort: "인기순" })],
+            ["신규 매물", `${baseLabel} 최근 3일 안에 올라온 매물`, () => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
+            ["가격 인하 매물", `${baseLabel} ${priceDownCount}건은 가격이 내려갔어요`, () => onBuyerList({ ...localPreset, sort: "추이 하락순" })],
+            ["인기 매물", `${baseLabel} 열람이 많은 직거래 매물`, () => onBuyerList({ ...localPreset, sort: "인기순" })],
           ]}/>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: C.dark }}>{localLabel} 추천 직거래 매물</div>
-            <button onClick={() => onBuyerList(localPreset)} style={{ background: "none", border: "none", color: C.goldInk, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>매물 찾기</button>
-          </div>
-          {buyerSummary.map(l => <ListingCard key={l.id} listing={l} tone="gold" onClick={() => setDetail({ listing: l, tone: "gold" })}/>)}
+          <SectionTitle title="기본지역 추천 매물" actionLabel="기본지역 매물로 이동" actionColor={C.goldInk} onAction={() => onBuyerList({ region: preferredRegion })}/>
+          {buyerBaseSummary.map(l => <ListingCard key={l.id} listing={l} tone="gold" onClick={() => setDetail({ listing: l, tone: "gold" })}/>)}
+          {hasInterestSection && <>
+            <SectionTitle title="관심지역 추천 매물" actionLabel="관심지역 매물로 이동" actionColor={C.goldInk} onAction={() => onBuyerList({ region: interestRegion })}/>
+            {buyerInterestSummary.map(l => <ListingCard key={l.id} listing={l} tone="gold" onClick={() => setDetail({ listing: l, tone: "gold" })}/>)}
+          </>}
           <div style={{ height: 64 }}/>
         </div>
       </div>
@@ -202,28 +233,27 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-      {sheet && <ListSheet kind={sheet} onClose={() => setSheet(null)}/>}
+      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} onClose={() => setSheet(null)}/>}
       <Header role={role} availableRoles={availableRoles} title="소유주 홈" subtitle="빠르게 집을 내놓아요" mood="calm" onSwitchRole={onSwitchRole} actionLabel="매물 의뢰하기" onAction={onRegister}/>
       <div style={{ padding: "18px 16px 0" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
           <StatCard value={ownerActiveCount + "건"} label="진행 의뢰" tone="green" onClick={() => onMyList()}/>
-          <StatCard value={ownerOffices.length + "곳"} label={`${officeLabel} 부동산`} tone="green" onClick={onOffices}/>
-          <StatCard value={DIRECT_BUYERS.length + "건"} label="직거래 문의" tone="gold" onClick={() => setSheet("direct")}/>
+          <StatCard value={INTEREST_BROKERS.length + "곳"} label="의뢰받은 부동산" tone="green" onClick={() => setSheet("broker")}/>
+          <StatCard value={DIRECT_BUYERS.length + "명"} label="직거래 매수자" tone="gold" onClick={() => setSheet("direct")}/>
         </div>
         <TaskList items={[
-          ["제안한 부동산", `${officeLabel} 기준 ${ownerOffices.length}곳이 보여요`, onOffices],
+          ["새롭게 제안한 부동산", `아직 확인하지 않은 제안 ${newBrokerProposals.length}곳`, () => setSheet({ kind: "broker", mode: "new" })],
+          ["새롭게 제안한 직거래 매수자", `아직 확인하지 않은 매수자 ${newDirectBuyers.length}명`, () => setSheet({ kind: "direct", mode: "new" })],
           ["내 매물 확인", `${ownerActiveCount}건 진행 중이에요`, () => onMyList()],
           ["만료 임박", `${expiringCount}건은 의뢰 기간 확인이 필요해요`, () => onMyList({ statusFilter: "만료 임박" })],
         ]}/>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div style={{ fontSize: 15, fontWeight: 900, color: C.dark }}>부동산 제안</div>
-          <button onClick={onOffices} style={{ background: "none", border: "none", color: C.greenInk, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>전체보기</button>
-        </div>
-        {ownerOffices.slice(0, 2).map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={onOffices}/>)}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "18px 0 10px" }}>
-          <div style={{ fontSize: 15, fontWeight: 900, color: C.dark }}>내 매물</div>
-          <button onClick={() => onMyList()} style={{ background: "none", border: "none", color: C.greenInk, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>내 매물로 이동</button>
-        </div>
+        <SectionTitle title="기본지역 추천 부동산" actionLabel="기본지역 부동산으로 이동" onAction={onOffices}/>
+        {(baseOffices.length ? baseOffices : ownerOffices.slice(0, 2)).map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={onOffices}/>)}
+        {hasInterestSection && <>
+          <SectionTitle title="관심지역 추천 부동산" actionLabel="관심지역 부동산으로 이동" onAction={onOffices}/>
+          {interestOffices.map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={onOffices}/>)}
+        </>}
+        <SectionTitle title="내 매물" actionLabel="내 매물로 이동" onAction={() => onMyList()}/>
         {ownerSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => onMyList()}/>)}
         <div style={{ height: 64 }}/>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { C, G } from "./theme";
 import { PROPERTIES, CHATS } from "./data/data";
 import { Splash, Login, Role } from "./components/Onboarding";
@@ -29,7 +29,6 @@ const saveSetting = (key, value) => {
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
 };
-
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [accountType, setAccountType] = useState("user");
@@ -48,6 +47,9 @@ export default function App() {
   useEffect(() => saveSetting("toad.preferredRegion", preferredRegion), [preferredRegion]);
   useEffect(() => saveSetting("toad.interestRegion", interestRegion), [interestRegion]);
   useEffect(() => saveSetting("toad.notifications", notifications), [notifications]);
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [screen]);
   // ===== 공용 매물 store (owner/broker/buyer가 같은 데이터를 봄) =====
   const [properties, setProperties] = useState(PROPERTIES);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
@@ -79,16 +81,14 @@ export default function App() {
     setScreen("home");
   };
   const openChat = id => { setActiveChat(id); setScreen("chatroom"); };
-  const regionPreset = () => ({ regions: Array.from(new Set([preferredRegion, interestRegion].filter(Boolean))) });
-  const withRegionPreset = (preset = {}) => preset.regions ? preset : { ...regionPreset(), ...preset };
-  const openBrokerList = (preset = {}) => { setBrokerPreset(withRegionPreset(preset)); setScreen("broker"); };
-  const openBuyerList = (preset = {}) => { setBuyerPreset(withRegionPreset(preset)); setScreen("buyer"); };
+  const openBrokerList = (preset = {}) => { setBrokerPreset({ region: preferredRegion, ...preset }); setScreen("broker"); };
+  const openBuyerList = (preset = {}) => { setBuyerPreset({ region: preferredRegion, ...preset }); setScreen("buyer"); };
   const openMyList = (preset = {}) => { setMyListPreset(preset); setScreen("mylist"); };
   const openSettings = () => { setSettingsBack(screen); setScreen("settings"); };
   const toggleNotification = key => setNotifications(n => ({ ...n, [key]: !n[key] }));
   const openMenu = k => {
-    if (["broker", "brokerViewed"].includes(k)) setBrokerPreset(regionPreset());
-    if (["buyer", "buyerViewed"].includes(k)) setBuyerPreset(regionPreset());
+    if (["broker", "brokerViewed"].includes(k)) setBrokerPreset({ region: preferredRegion });
+    if (["buyer", "buyerViewed"].includes(k)) setBuyerPreset({ region: preferredRegion });
     if (k === "mylist") setMyListPreset({});
     setScreen(k);
   };
@@ -140,7 +140,7 @@ export default function App() {
           {screen === "chatroom" && <ChatRoom chatId={activeChat} role={role} onBack={() => setScreen("chatlist")}/>}
           {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}
           {screen === "profile" && role !== "broker" && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: G.pageProfile }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: G.pageBg }}>
               <Frog mood="sleepy" size={110} animate/>
               <div style={{ fontSize: 16, fontWeight: 800, color: C.dark }}>준비 중이에요</div>
               <div style={{ fontSize: 13, color: C.gray }}>곧 업데이트될 예정이에요</div>
