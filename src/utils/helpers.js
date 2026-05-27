@@ -1,21 +1,23 @@
-// 역할 라벨/순환
-export const ROLE_LABEL = { owner: "집주인", broker: "중개사", buyer: "직거래" };
+export const ROLE_LABEL = { owner: "소유주", broker: "중개사", buyer: "직거래" };
 export const ROLE_NEXT = { owner: "broker", broker: "buyer", buyer: "owner" };
 
-
 // ===== 완료 매물 처리 헬퍼 =====
-// 완료 후 3일이 지나면 목록에서 자동으로 사라짐
-export const AUTO_HIDE_DAYS = 3;
+// 완료 매물은 별도 필터에서 30일 동안만 보관
+export const AUTO_HIDE_DAYS = 30;
+export const NEW_DAYS = 3;
 export const isDone = p => p.status === "done";
 export const isExpired = p => isDone(p) && p.completedDaysAgo != null && p.completedDaysAgo >= AUTO_HIDE_DAYS;
-// 완료까지 남은 노출 일수 (3일째엔 "오늘 사라짐")
+export const isNewListing = p => p.status === "active" && (p.createdDaysAgo ?? 0) <= NEW_DAYS;
+// 완료까지 남은 보관 일수
 export const daysLeft = p => Math.max(0, AUTO_HIDE_DAYS - (p.completedDaysAgo ?? 0));
-// 상태 필터 ("거래중만" → active만, "완료 포함" → 만료 안 된 것 모두)
+// 상태 필터: 거래중/신규/만료 임박/완료 보관함
 export function applyStatusFilter(list, mode) {
-  if (mode === "완료 포함") return list.filter(p => !isExpired(p));
+  if (mode === "3일 이내 신규") return list.filter(isNewListing);
+  if (mode === "만료 임박") return list.filter(isExpiringSoon);
+  if (mode === "완료 매물") return list.filter(p => isDone(p) && !isExpired(p));
   return list.filter(p => p.status === "active");
 }
-export const STATUS_FILTERS = ["거래중만 보기", "완료 포함"];
+export const STATUS_FILTERS = ["거래중만 보기", "3일 이내 신규", "만료 임박", "완료 매물"];
 
 // ===== 의뢰 기한 처리 헬퍼 =====
 export const DEFAULT_TERM_DAYS = 14;   // 기본 의뢰 기한 2주
@@ -54,3 +56,13 @@ export function feeFormula(p) {
   return `${feeBase(p).toLocaleString()}만원 × 상한 ${p.fee}`;
 }
 
+export function priceChangeRate(p) {
+  const h = p.priceHistory || [];
+  if (h.length < 2) return 0;
+  const first = h[0].priceNum || p.priceNum;
+  const last = h[h.length - 1].priceNum || p.priceNum;
+  if (!first) return 0;
+  return ((last - first) / first) * 100;
+}
+
+export const updateLabel = p => `${p.updatedAgo || p.ago || "방금 전"} 수정함`;

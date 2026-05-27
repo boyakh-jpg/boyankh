@@ -16,7 +16,7 @@ export const C = {
   line: "#EAF0EB",
 };
 export const G = {
-  header: "linear-gradient(155deg, #8FCCAE 0%, #7FC2A6 50%, #6FB894 100%)",
+  header: "#7FC2A6",
   headerSoft: "linear-gradient(160deg, #A9DCC4 0%, #8FCCAE 100%)",
   card: "linear-gradient(165deg, #FFFFFF 0%, #FBFDFB 100%)",
   greenSoft: "linear-gradient(155deg, #EEF7F1 0%, #E4F1EA 100%)",
@@ -29,4 +29,3 @@ export const G = {
 export const SH1 = "0 4px 16px rgba(110,150,130,.10)";
 export const SH2 = "0 2px 10px rgba(110,150,130,.08)";
 export const spring = "cubic-bezier(.34,1.56,.64,1)";
-
