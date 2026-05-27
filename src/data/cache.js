@@ -9,6 +9,7 @@ export const CACHE_KEYS = {
   pointLedger: "toad.pointLedger",
 };
 
+
 const memoryCache = {};
 
 export function loadCache(key, fallback) {

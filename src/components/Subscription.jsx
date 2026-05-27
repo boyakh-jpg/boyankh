@@ -2,6 +2,7 @@
 import { C, G, SH1, SH2 } from "../theme";
 import { RoleToggle, Frog, Btn, Tag } from "./common";
 
+
 export function Subscription({ picked: initialPicked = "골드", availableRoles, onPick, onSwitchRole }) {
   const [picked, setPicked] = useState(initialPicked);
   const chooseTier = name => {

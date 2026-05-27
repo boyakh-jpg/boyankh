@@ -4,6 +4,7 @@ import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/dat
 import { applyStatusFilter, STATUS_FILTERS, isDone, isExpiringSoon, daysLeft, termLabel, termLeft, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Frog, Tag } from "./common";
 
+
 function MultiFilter({ label, options, values, onToggle, tone = "gold" }) {
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
   const soft = tone === "gold" ? G.goldSoft : G.greenSoft;

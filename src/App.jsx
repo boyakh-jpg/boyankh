@@ -14,6 +14,7 @@ import { Settings } from "./components/Settings";
 import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 
+
 const loadSetting = (key, fallback) => {
   try {
     if (typeof window === "undefined") return fallback;

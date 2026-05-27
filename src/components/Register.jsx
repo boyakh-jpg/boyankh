@@ -2,6 +2,7 @@
 import { C, G, SH1, SH2 } from "../theme";
 import { Frog, Btn, Dots, Slide, Tag, Dot } from "./common";
 
+
 export function Register({ onDone, onClose, onBack }) {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
