@@ -189,7 +189,7 @@ export function ChatRoom({ chatId, role, onBack }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
       <div style={{ background: G.header, padding: "44px 16px 14px", flexShrink: 0, boxShadow: "0 4px 16px rgba(111,184,148,.2)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: "#fff", fontSize: 24, cursor: "pointer", padding: 0 }}>← 채팅</button>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 900, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>← 채팅</button>
           <Frog mood={isDirect?"love":"calm"} size={40}/>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#fff", fontSize: 15, fontWeight: 700 }}>{chat.name}</div>
