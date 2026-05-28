@@ -24,7 +24,8 @@ export const DEFAULT_TERM_DAYS = 14;   // 기본 의뢰 기한 2주
 export const EXTEND_DAYS = 14;         // 원터치 연장 단위
 export const EXPIRE_SOON_DAYS = 3;     // 만료 임박 알림 기준
 export const termLeft = p => p.expiresInDays ?? DEFAULT_TERM_DAYS;       // 남은 기한(일)
-export const isExpiringSoon = p => p.status === "active" && termLeft(p) <= EXPIRE_SOON_DAYS; // 곧 만료
+export const isTermExpired = p => p.status === "active" && termLeft(p) <= 0; // 의뢰 기한 만료
+export const isExpiringSoon = p => p.status === "active" && termLeft(p) > 0 && termLeft(p) <= EXPIRE_SOON_DAYS; // 곧 만료
 export const termLabel = p => { const n = termLeft(p); return n <= 0 ? "기한 만료" : n === 1 ? "내일 만료" : `${n}일 남음`; };
 
 // ===== 예상 중개 수수료 계산 =====

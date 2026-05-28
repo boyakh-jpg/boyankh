@@ -4,6 +4,7 @@ import { CHATS } from "../data/data";
 import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
+import { isTermExpired } from "../utils/helpers";
 import { RoleToggle, Frog, Tag } from "./common";
 
 const DEMO_TEST_CHAT = {
@@ -23,15 +24,17 @@ const chatFromContext = context => {
   if (!context?.listing) return null;
   const listing = context.listing;
   const property = `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim();
+  const expired = isTermExpired(listing);
   return {
     id: context.id,
     name: "매물 소유주",
-    office: listing.fast ? "연락처 확인 완료" : "연락처 비공개",
+    office: expired ? "의뢰 만료" : listing.fast ? "연락처 확인 완료" : "연락처 비공개",
     property: property || "등록 매물",
     unread: 0,
     mode: context.mode || (listing.fast ? "빠른의뢰" : "안심의뢰"),
+    expired,
     messages: [
-      { from: "broker", senderKey: "toad-demo-system", senderName: "채팅 안내", text: "연락처 확인 후 생성된 매물별 채팅방이에요.", time: "방금 전" },
+      { from: "broker", senderKey: "toad-demo-system", senderName: "채팅 안내", text: expired ? "매물 의뢰가 만료됐어요. 연락처 조회와 공개 요청은 다시 의뢰된 뒤 가능해요." : "연락처 확인 후 생성된 매물별 채팅방이에요.", time: "방금 전" },
     ],
   };
 };
@@ -294,17 +297,19 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
     });
   };
 
+  const isDirect = chat.mode === "직거래";
+  const isFast = chat.mode === "빠른의뢰";
+  const expired = !!chat.expired;
   const send = () => {
+    if (expired) return;
     const text = input.trim();
     if (!text) return;
     setInput("");
     appendMessage({ senderKey: demoUser.id, senderName: demoUser.label, text });
   };
-  const isDirect = chat.mode === "직거래";
-  const isFast = chat.mode === "빠른의뢰";
   const partner = chatPartnerProfile(chat, role, demoUser);
   const headerSubtitleLines = partner.subtitleLines || [partner.subtitle];
-  const needsContactApproval = !chat.demo && !isFast;
+  const needsContactApproval = !expired && !chat.demo && !isFast;
   const canApproveContact = role === "owner";
   const contactDecision = localContactDecision;
   const decideContact = approved => {
@@ -419,8 +424,8 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
       <button onClick={() => listRef.current?.scrollTo({ top: 0, behavior: "smooth" })} aria-label="채팅 맨 위로" style={{ position: "absolute", left: "50%", bottom: 18, transform: "translateX(-50%)", width: 42, height: 42, borderRadius: 21, border: `1px solid rgba(205,216,208,.42)`, background: "rgba(255,255,255,.38)", color: "rgba(69,126,92,.58)", fontSize: 18, fontWeight: 900, cursor: "pointer", zIndex: 8, boxShadow: "0 8px 20px rgba(60,90,70,.10)", fontFamily: "inherit", backdropFilter: "blur(6px)" }}>↑</button>
       </div>
       <div style={{ flexShrink: 0, padding: "10px 14px", background: "#fff", borderTop: `1px solid ${C.line}`, display: "flex", gap: 8, alignItems: "center" }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="메시지 입력..." style={{ flex: 1, padding: "12px 16px", borderRadius: 22, border: `1.5px solid ${C.line}`, fontSize: 14, fontFamily: "inherit", outline: "none", background: G.bg }}/>
-        <button onClick={send} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: G.header, color: "#fff", fontSize: 20, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", lineHeight: 1 }}>↵</button>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={expired ? "만료된 의뢰는 메시지를 보낼 수 없어요" : "메시지 입력..."} disabled={expired} style={{ flex: 1, padding: "12px 16px", borderRadius: 22, border: `1.5px solid ${C.line}`, fontSize: 14, fontFamily: "inherit", outline: "none", background: expired ? "#F2F4F3" : G.bg, color: expired ? C.gray : C.dark }}/>
+        <button onClick={send} disabled={expired} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: expired ? "#D5DDD7" : G.header, color: "#fff", fontSize: 20, cursor: expired ? "default" : "pointer", flexShrink: 0, fontFamily: "inherit", lineHeight: 1 }}>↵</button>
       </div>
     </div>
   );

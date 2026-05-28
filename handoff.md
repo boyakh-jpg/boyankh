@@ -817,5 +817,16 @@ alter publication supabase_realtime add table public.chat_messages;
 - 채팅 메시지 본문에는 소유주 연락처 원문을 저장하거나 표시하지 않는다.
 - `src/components/Chat.jsx`의 연락처 승인 안내는 승인/거절 상태만 표시한다.
 - 실제 서비스에서는 `listings` 공개 조회 응답에 `owner_phone`을 포함하지 않아야 한다.
+- `src/App.jsx`는 `LISTING_PUBLIC_COLUMNS`로 `listings` 공개 조회 컬럼을 명시하고 `owner_phone`을 요청하지 않는다.
 - 연락처 공개는 `contact_requests` 승인 상태, 포인트 차감 확정, 참여자 권한 검증 후 서버 API/RPC로만 내려줘야 한다.
 - 연락처 조회 이력은 감사 로그로 남기고, 채팅 메시지에는 전화번호를 복사 저장하지 않는다.
+
+## 추가 인계: 의뢰 만료 시 연락처 차단 기준
+
+- `src/utils/helpers.js`에 `isTermExpired`를 추가했다.
+- 기준은 `status === "active"`이고 `expiresInDays <= 0`인 매물이다.
+- `src/components/Broker.jsx`, `src/components/BuyerExplore.jsx`는 만료 매물에서 연락처 열람/공개 요청/채팅방 열기를 막는다.
+- 만료 매물 문구는 `매물 의뢰가 만료됐어요` 기준으로 표시한다.
+- `src/components/Chat.jsx`는 만료 매물 채팅 컨텍스트에서 연락처 요청 박스와 메시지 입력을 막는다.
+- 실제 백엔드에서는 만료 매물에 대해 `owner_phone` 조회 API/RPC가 403/410을 반환해야 한다.
+- 포인트 차감은 연락처 조회 가능 여부를 서버에서 확인한 뒤에만 확정해야 한다.

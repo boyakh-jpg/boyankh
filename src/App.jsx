@@ -37,6 +37,7 @@ const roleAccessFor = (demoRole, accountType) => {
   return ["owner", "buyer"];
 };
 const OWNER_KEY = "toad-demo-owner";
+const LISTING_PUBLIC_COLUMNS = "id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo";
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
   mine: row.mine || row.owner_key === ownerKey,
@@ -185,7 +186,7 @@ export default function App() {
     async function loadListings() {
       const { data, error } = await supabase
         .from("listings")
-        .select("*");
+        .select(LISTING_PUBLIC_COLUMNS);
 
       if (error) {
         console.error("Supabase listings error:", error);
@@ -205,7 +206,7 @@ export default function App() {
     let { data, error } = await supabase
       .from("listings")
       .insert(insertRow)
-      .select("*")
+      .select(LISTING_PUBLIC_COLUMNS)
       .single();
 
     if (error && error.message?.includes("owner_key")) {
@@ -213,7 +214,7 @@ export default function App() {
       ({ data, error } = await supabase
         .from("listings")
         .insert(fallbackRow)
-        .select("*")
+        .select(LISTING_PUBLIC_COLUMNS)
         .single());
     }
 

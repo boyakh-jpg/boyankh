@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { C, G, SH1, SH2, spring } from "../theme";
 import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/data";
-import { applyStatusFilter, STATUS_FILTERS, isDone, isExpiringSoon, daysLeft, termLabel, termLeft, priceChangeRate, updateLabel } from "../utils/helpers";
+import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Frog, Tag } from "./common";
 
 
@@ -111,7 +111,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     if (appliedFilters.listMode === "favorite") return favorites[p.id];
     return !appliedFilters.hideViewed || !unlocked[p.id];
   };
-  const isListEligible = p => isDone(p) || termLeft(p) > 0;
+  const isListEligible = p => isDone(p) || p.status === "active";
   let list = properties.filter(p => isListEligible(p) && inListScope(p) && matchesAppliedRegion(p) && (appliedFilters.dong === "전체" || p.dong === appliedFilters.dong) && (!appliedFilters.ptypes.length || appliedFilters.ptypes.includes(p.propType)) && (!appliedFilters.dealTypes.length || appliedFilters.dealTypes.includes(p.dealType)) && (p.priceNum || 0) >= appliedFilters.priceMin && (p.priceNum || 0) <= appliedFilters.priceMax);
   list = applyStatusFilter(list, appliedFilters.statusFilter);
   if (appliedFilters.sort === "낮은가격순") list = [...list].sort((a, b) => a.priceNum - b.priceNum);
@@ -175,15 +175,18 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     return Number(p.tenantMonthly) > 0 ? `${deposit}/${Number(p.tenantMonthly).toLocaleString()}만` : deposit;
   };
   const leaseBadge = p => p.dealType === "매매" && p.tenant === "있어요" ? (Number(p.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
-  const ownerPhone = p => p.ownerPhone || "010-1234-5678";
   const openPay = p => {
+    if (isTermExpired(p)) {
+      showToast("매물 의뢰가 만료됐어요 · 연락처 요청 불가");
+      return;
+    }
     if (points < 10000) {
       showToast("포인트가 부족해요 · 충전 후 이용 가능");
       setChargeOpen(true);
       return;
     }
     if (p.fast) {
-      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { setPoints(v => v - 10000); setUnlocked(u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처가 공개됐어요"); } });
+      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { setPoints(v => v - 10000); setUnlocked(u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처 확인 완료"); } });
       return;
     }
     openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { setPoints(v => v - 10000); setRequests(r => ({ ...r, [p.id]: "pending" })); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
@@ -199,6 +202,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     const open = unlocked[listing.id];
     const requested = requests[listing.id] === "pending";
     const done = isDone(listing);
+    const expired = isTermExpired(listing);
     const badge = leaseBadge(listing);
     const favorite = !!favorites[listing.id];
     return (
@@ -263,8 +267,10 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
           )}
           {done ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>거래 완료된 매물</div>
+          ) : expired ? (
+            <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 요청 불가</div>
           ) : open ? (
-            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>소유주 {ownerPhone(listing)} · 채팅 걸기</button>
+            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>연락처 확인 완료 · 채팅 걸기</button>
           ) : requested ? (
             <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>채팅방 열기 · 승인 대기</button>
           ) : (
@@ -280,6 +286,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     const requested = requests[p.id] === "pending";
     const hi = activePin === p.id;
     const done = isDone(p);
+    const expired = isTermExpired(p);
     const left = daysLeft(p);
     const badge = leaseBadge(p);
     const favorite = !!favorites[p.id];
@@ -296,11 +303,13 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
         <div style={{ fontSize: 15, fontWeight: 700, color: C.dark }}>{p.complex}</div>
         <div style={{ fontSize: 12, color: C.gray, marginBottom: 8 }}>{p.area}㎡ · {p.floor}층</div>
         <div style={{ fontSize: 20, fontWeight: 900, color: C.dark, marginBottom: 12 }}>{p.price}</div>
-        {!done && <div style={{ display: "inline-flex", background: isExpiringSoon(p) ? G.goldSoft : G.greenSoft, color: isExpiringSoon(p) ? C.goldInk : C.greenInk, borderRadius: 8, padding: "3px 7px", fontSize: 10, fontWeight: 800, marginBottom: 10 }}>의뢰기한 {termLabel(p)}</div>}
+        {!done && <div style={{ display: "inline-flex", background: expired ? "#F2F4F3" : isExpiringSoon(p) ? G.goldSoft : G.greenSoft, color: expired ? "#7B8580" : isExpiringSoon(p) ? C.goldInk : C.greenInk, borderRadius: 8, padding: "3px 7px", fontSize: 10, fontWeight: 800, marginBottom: 10 }}>의뢰기한 {termLabel(p)}</div>}
         {done ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#7B8580", fontWeight: 700, textAlign: "center" }}>거래 완료된 매물 · {left === 0 ? "오늘 목록에서 사라져요" : `${left}일 후 사라져요`}</div>
+        ) : expired ? (
+          <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#7B8580", fontWeight: 700, textAlign: "center" }}>매물 의뢰가 만료됐어요 · 연락처 요청 불가</div>
         ) : open ? (
-          <button onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(p); }} style={{ width: "100%", background: G.greenSoft, border: "none", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: C.greenInk, fontWeight: 800, textAlign: "center", cursor: "pointer", fontFamily: "inherit" }}>소유주 {ownerPhone(p)} · 채팅 걸기</button>
+          <button onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(p); }} style={{ width: "100%", background: G.greenSoft, border: "none", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: C.greenInk, fontWeight: 800, textAlign: "center", cursor: "pointer", fontFamily: "inherit" }}>연락처 확인 완료 · 채팅 걸기</button>
         ) : requested ? (
           <button onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(p); }} style={{ width: "100%", background: G.greenSoft, border: "none", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: C.greenInk, fontWeight: 800, textAlign: "center", cursor: "pointer", fontFamily: "inherit" }}>채팅방 열기 · 승인 대기 중</button>
         ) : (

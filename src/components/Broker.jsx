@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { C, G, SH1, SH2, spring } from "../theme";
 import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/data";
-import { applyStatusFilter, STATUS_FILTERS, isDone, isExpiringSoon, daysLeft, termLabel, termLeft, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
+import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
 import { getDemoUser } from "../data/demoUsers";
 
@@ -114,13 +114,21 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
     return true;
   };
   const handleFast = l => {
+    if (isTermExpired(l)) {
+      showToast("매물 의뢰가 만료됐어요 · 연락처 조회 불가");
+      return;
+    }
     if (needPoints(tierCost.fast)) return;
     setPoints(p => p - tierCost.fast);
     markContacted(l.id);
     markViewed(l.id);
-    showToast(`번호 공개됨 · ${tierCost.fast.toLocaleString()}P 차감`);
+    showToast(`연락처 확인 완료 · ${tierCost.fast.toLocaleString()}P 차감`);
   };
   const openApply = l => {
+    if (isTermExpired(l)) {
+      showToast("매물 의뢰가 만료됐어요 · 중개 의뢰 불가");
+      return;
+    }
     if (needPoints(tierCost.safe)) return;
     openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { setPoints(p => p - tierCost.safe); markContacted(l.id); markSafeRequest(l.id, "pending"); markViewed(l.id); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
   };
@@ -139,7 +147,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
     if (appliedFilters.listMode === "favorite") return favorites[p.id];
     return !appliedFilters.hideViewed || !contacted[p.id];
   };
-  const isListEligible = p => isDone(p) || termLeft(p) > 0;
+  const isListEligible = p => isDone(p) || p.status === "active";
   // 필터 + 정렬 (기본은 거래중, 완료 매물은 별도 필터에서 30일 보관)
   let list = properties.filter(p => isListEligible(p) && inListScope(p) && matchesAppliedRegion(p) && (appliedFilters.dong === "전체" || p.dong === appliedFilters.dong) && (!appliedFilters.ptypes.length || appliedFilters.ptypes.includes(p.propType)) && (!appliedFilters.dealTypes.length || appliedFilters.dealTypes.includes(p.dealType)));
   list = applyStatusFilter(list, appliedFilters.statusFilter);
@@ -201,10 +209,9 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
     return Number(l.tenantMonthly) > 0 ? `${deposit}/${Number(l.tenantMonthly).toLocaleString()}만` : deposit;
   };
   const leaseBadge = l => l.dealType === "매매" && l.tenant === "있어요" ? (Number(l.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
-  const ownerPhone = l => l.ownerPhone || "010-1234-5678";
-
   const DetailSheet = ({ listing }) => {
     const done = isDone(listing);
+    const expired = isTermExpired(listing);
     const cost = listing.fast ? tierCost.fast : tierCost.safe;
     const insufficient = points < cost;
     const badge = leaseBadge(listing);
@@ -270,10 +277,12 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
           )}
           {done ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>거래 완료된 매물</div>
+          ) : expired ? (
+            <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
           ) : contacted[listing.id] ? (
-            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? `소유주 ${ownerPhone(listing)} · 채팅하기` : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
+            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 확인 완료 · 채팅하기" : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
           ) : (
-            <button onClick={() => { if (listing.fast) handleFast(listing); else { setSelected(null); openApply(listing); } }} style={{ width: "100%", padding: "14px 0", background: insufficient ? "#D5DDD7" : (listing.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (listing.fast ? `번호 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
+            <button onClick={() => { if (listing.fast) handleFast(listing); else { setSelected(null); openApply(listing); } }} style={{ width: "100%", padding: "14px 0", background: insufficient ? "#D5DDD7" : (listing.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (listing.fast ? `연락처 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
           )}
         </div>
       </div>
@@ -283,6 +292,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const Card = l => {
     const hi = activePin === l.id;
     const done = isDone(l);
+    const expired = isTermExpired(l);
     const left = daysLeft(l);
     const cost = l.fast ? tierCost.fast : tierCost.safe;
     const insufficient = points < cost;
@@ -310,16 +320,18 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
           <span>👁 열람 {l.views}회</span>
           <span>수수료 상한 {l.fee}</span>
         </div>
-        {!done && <div style={{ display: "inline-flex", background: isExpiringSoon(l) ? G.goldSoft : G.greenSoft, color: isExpiringSoon(l) ? C.goldInk : C.greenInk, borderRadius: 8, padding: "3px 7px", fontSize: 10, fontWeight: 800, marginBottom: 10 }}>의뢰기한 {termLabel(l)}</div>}
+        {!done && <div style={{ display: "inline-flex", background: expired ? "#F2F4F3" : isExpiringSoon(l) ? G.goldSoft : G.greenSoft, color: expired ? "#7B8580" : isExpiringSoon(l) ? C.goldInk : C.greenInk, borderRadius: 8, padding: "3px 7px", fontSize: 10, fontWeight: 800, marginBottom: 10 }}>의뢰기한 {termLabel(l)}</div>}
         {!done && <FeeEstimate listing={l} tone={l.fast ? "gold" : "green"}/>}
         {done ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "11px 14px", textAlign: "center", color: "#7B8580", fontWeight: 700, fontSize: 13 }}>
             거래가 완료된 매물이에요 · {left === 0 ? "오늘 목록에서 사라져요" : `${left}일 후 목록에서 사라져요`}
           </div>
+        ) : expired ? (
+          <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "11px 14px", textAlign: "center", color: "#7B8580", fontWeight: 700, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
         ) : contacted[l.id] ? (
-          <div onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(l); }} style={{ background: G.greenSoft, borderRadius: 12, padding: "12px 0", textAlign: "center", color: C.greenInk, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{l.fast ? `소유주 ${ownerPhone(l)} · 채팅하기` : "채팅방 열기 · 승인 대기 중"}</div>
+          <div onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(l); }} style={{ background: G.greenSoft, borderRadius: 12, padding: "12px 0", textAlign: "center", color: C.greenInk, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{l.fast ? "연락처 확인 완료 · 채팅하기" : "채팅방 열기 · 승인 대기 중"}</div>
         ) : (
-          <button onClick={(e) => { e.stopPropagation(); if (l.fast) handleFast(l); else openApply(l); }} style={{ width: "100%", padding: "13px 0", background: insufficient ? "#D5DDD7" : (l.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (l.fast ? `번호 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
+          <button onClick={(e) => { e.stopPropagation(); if (l.fast) handleFast(l); else openApply(l); }} style={{ width: "100%", padding: "13px 0", background: insufficient ? "#D5DDD7" : (l.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (l.fast ? `연락처 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
         )}
         <NoteField value={notes[l.id]} onChange={t => setNotes(n => ({ ...n, [l.id]: t }))} tone={l.fast ? "gold" : "green"}/>
       </div>
