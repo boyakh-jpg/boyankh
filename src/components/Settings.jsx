@@ -1,5 +1,7 @@
-﻿import { C, G, SH1, SH2 } from "../theme";
+import { useState } from "react";
+import { C, G, SH1, SH2 } from "../theme";
 import { REGIONS } from "../data/data";
+import { DEMO_USERS, getDemoUser, saveDemoUser } from "../data/demoUsers";
 import { Frog, RoleToggle, SelectBox, Tag } from "./common";
 
 const NOTIFICATION_LABELS = [
@@ -47,6 +49,12 @@ function MenuRow({ title, sub, tag, onClick }) {
 
 export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", onSubscription, onBack }) {
   const regionOptions = REGIONS.filter(r => r !== "전체");
+  const [demoUserId, setDemoUserId] = useState(() => getDemoUser().id);
+  const selectedDemoUser = DEMO_USERS.find(user => user.id === demoUserId) || DEMO_USERS[0];
+  const selectDemoUser = user => {
+    saveDemoUser(user.id);
+    setDemoUserId(user.id);
+  };
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%" }}>
       <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
@@ -62,6 +70,24 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
         </div>
       </div>
       <div style={{ padding: 16 }}>
+        <Section title="테스트 아이디">
+          <div style={{ background: G.greenSoft, borderRadius: 14, padding: "12px 13px", marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: C.greenInk, fontWeight: 900 }}>{selectedDemoUser.label}</div>
+            <div style={{ fontSize: 12, color: C.mid, lineHeight: 1.55, marginTop: 3 }}>{selectedDemoUser.id}</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {DEMO_USERS.map(user => {
+              const active = user.id === demoUserId;
+              return (
+                <button key={user.id} onClick={() => selectDemoUser(user)} style={{ border: `1.5px solid ${active ? C.green : C.line}`, background: active ? G.greenSoft : "#fff", borderRadius: 14, padding: "11px 9px", textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}>
+                  <div style={{ fontSize: 13, color: active ? C.greenInk : C.dark, fontWeight: 900 }}>{user.label}</div>
+                  <div style={{ fontSize: 11, color: C.gray, marginTop: 3, lineHeight: 1.35 }}>{user.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: C.gray, lineHeight: 1.6 }}>채팅은 선택한 테스트 아이디를 발신자로 저장해요. 역할 화면은 위쪽 역할 전환 버튼으로 맞춰서 보면 돼요.</div>
+        </Section>
         <Section title="내 지역">
           <SelectBox label="기본 지역" value={preferredRegion} options={regionOptions} onChange={onRegionChange}/>
           <div style={{ height: 8 }}/>
