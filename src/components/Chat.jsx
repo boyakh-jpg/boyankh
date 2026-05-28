@@ -388,7 +388,7 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
             const requestNotice = senderName === "연락처 요청";
             return (
               <div key={m.id || m.tempId || i} style={{ alignSelf: "center", width: "92%", background: requestNotice ? G.goldSoft : G.greenSoft, border: `1px solid ${requestNotice ? C.gold : C.green}`, borderRadius: 16, padding: "12px 13px", boxShadow: SH2, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <div style={{ width: 34, height: 34, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Frog mood={requestNotice ? "nervous" : "pondering"} size={30}/></div>
+                {!requestNotice && <div style={{ width: 34, height: 34, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Frog mood="pondering" size={30}/></div>}
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 12, color: requestNotice ? C.goldInk : C.greenInk, fontWeight: 900, marginBottom: 4 }}>{senderName || "공지"}</div>
                   <div style={{ fontSize: 13, color: C.dark, fontWeight: 700, lineHeight: 1.5 }}>{m.text}</div>
