@@ -7,6 +7,7 @@ export const CACHE_KEYS = {
   brokerProposals: "toad.brokerProposals",
   buyerProposals: "toad.buyerProposals",
   pointLedger: "toad.pointLedger",
+  chatMessages: "toad.chatMessages",
 };
 
 
