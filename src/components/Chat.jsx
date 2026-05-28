@@ -3,9 +3,16 @@ import { C, G, SH2 } from "../theme";
 import { CHATS } from "../data/data";
 import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
+import { supabase } from "../supabaseClient";
 import { RoleToggle, Frog, Tag } from "./common";
 
-const chatStorageKey = chatId => `${CACHE_KEYS.chatMessages}.${chatId}`;
+const chatTime = value => {
+  try {
+    return new Date(value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+};
 
 const baseMessages = chat => chat.messages.map((message, index) => ({
   ...message,
@@ -13,32 +20,51 @@ const baseMessages = chat => chat.messages.map((message, index) => ({
   senderName: message.senderName || (message.from === "me" ? "소유주 A" : chat.name),
 }));
 
-const loadStoredMessages = chat => {
-  try {
-    if (typeof window === "undefined") return baseMessages(chat);
-    const saved = window.localStorage.getItem(chatStorageKey(chat.id));
-    if (!saved) return baseMessages(chat);
-    const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) && parsed.length ? parsed : baseMessages(chat);
-  } catch {
-    return baseMessages(chat);
-  }
-};
-
-const saveStoredMessages = (chatId, messages) => {
-  try {
-    if (typeof window !== "undefined") window.localStorage.setItem(chatStorageKey(chatId), JSON.stringify(messages));
-  } catch {}
-};
-
-const latestMessage = chat => {
-  const messages = loadStoredMessages(chat);
-  return messages[messages.length - 1] || chat.messages[chat.messages.length - 1];
-};
+const messageFromRow = row => ({
+  id: row.id,
+  senderKey: row.sender_key,
+  senderName: row.sender_name,
+  text: row.body,
+  time: chatTime(row.created_at),
+  createdAt: row.created_at,
+});
 
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   const demoUser = getDemoUser();
   const visibleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true);
+  const [latestByThread, setLatestByThread] = useState({});
+
+  useEffect(() => {
+    let alive = true;
+    async function loadLatestMessages() {
+      const threadIds = visibleChats.map(c => c.id);
+      if (!threadIds.length) return;
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("thread_id,sender_name,body,created_at")
+        .in("thread_id", threadIds)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Supabase chat_messages latest error:", error);
+        return;
+      }
+
+      const next = {};
+      (data || []).forEach(row => {
+        next[row.thread_id] = {
+          senderName: row.sender_name,
+          text: row.body,
+          time: chatTime(row.created_at),
+        };
+      });
+      if (alive) setLatestByThread(next);
+    }
+
+    loadLatestMessages();
+    return () => { alive = false; };
+  }, [role]);
+
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%" }}>
       <div style={{ background: G.header, padding: "46px 20px 26px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
@@ -53,7 +79,8 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
       </div>
       <div style={{ padding: "14px 16px" }}>
         {visibleChats.map(c => {
-          const last = latestMessage(c);
+          const base = baseMessages(c);
+          const last = latestByThread[c.id] || base[base.length - 1] || c.messages[c.messages.length - 1];
           return (
             <div key={c.id} onClick={() => onOpen(c.id)} style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2, cursor: "pointer", display: "flex", gap: 12, alignItems: "center" }}>
               <div style={{ position: "relative" }}>
@@ -78,7 +105,7 @@ export function ChatRoom({ chatId, role, onBack }) {
   const chat = CHATS.find(c => c.id === chatId) || CHATS[0];
   const demoUser = getDemoUser();
   const decisionKey = chat.contactRequestId || chat.id;
-  const [msgs, setMsgs] = useState(() => loadStoredMessages(chat));
+  const [msgs, setMsgs] = useState(() => baseMessages(chat));
   const [input, setInput] = useState("");
   const [localContactDecision, setLocalContactDecision] = useState(() => {
     const cached = loadCache(CACHE_KEYS.contactDecisions, {});
@@ -86,17 +113,58 @@ export function ChatRoom({ chatId, role, onBack }) {
   });
   const listRef = useRef(null);
   const endRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    setMsgs(baseMessages(chat));
+    async function loadMessages() {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("thread_id", chat.id)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Supabase chat_messages select error:", error);
+        return;
+      }
+
+      if (alive && Array.isArray(data) && data.length > 0) {
+        setMsgs(data.map(messageFromRow));
+      }
+    }
+
+    loadMessages();
+    return () => { alive = false; };
+  }, [chat.id]);
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
-  useEffect(() => { saveStoredMessages(chat.id, msgs); }, [chat.id, msgs]);
+
+  const appendMessage = async ({ senderKey, senderName, text }) => {
+    const now = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const optimistic = { tempId, senderKey, senderName, text, time: now };
+    setMsgs(m => [...m, optimistic]);
+
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .insert({ thread_id: chat.id, sender_key: senderKey, sender_name: senderName, body: text })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("Supabase chat_messages insert error:", error);
+      return;
+    }
+
+    setMsgs(m => m.map(message => message.tempId === tempId ? messageFromRow(data) : message));
+  };
+
   const send = () => {
     const text = input.trim();
     if (!text) return;
-    const now = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-    setMsgs(m => [...m, { from: "me", senderKey: demoUser.id, senderName: demoUser.label, text, time: now }]);
     setInput("");
-    setTimeout(() => {
-      setMsgs(m => [...m, { from: "broker", senderKey: "toad-demo-auto", senderName: "자동 응답", text: "네, 확인했습니다! 곧 다시 연락드릴게요.", time: now }]);
-    }, 1100);
+    appendMessage({ senderKey: demoUser.id, senderName: demoUser.label, text });
   };
   const isDirect = chat.mode === "직거래";
   const isFast = chat.mode === "빠른의뢰";
@@ -111,14 +179,11 @@ export function ChatRoom({ chatId, role, onBack }) {
       ...(cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {}),
       [decisionKey]: nextDecision,
     });
-    const now = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-    setMsgs(m => [...m, {
-      from: "broker",
+    appendMessage({
       senderKey: "toad-demo-system",
       senderName: "연락처 요청",
       text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐고 010-1234-5678로 연락할 수 있어요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
-      time: now,
-    }]);
+    });
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
@@ -154,12 +219,12 @@ export function ChatRoom({ chatId, role, onBack }) {
         {msgs.map((m, i) => {
           const mine = m.senderKey ? m.senderKey === demoUser.id : m.from === "me";
           return mine ? (
-            <div key={i} style={{ alignSelf: "flex-end", maxWidth: "76%" }}>
+            <div key={m.id || m.tempId || i} style={{ alignSelf: "flex-end", maxWidth: "76%" }}>
               <div style={{ background: G.header, color: "#fff", padding: "10px 14px", borderRadius: "16px 16px 4px 16px", fontSize: 14, lineHeight: 1.5, boxShadow: SH2 }}>{m.text}</div>
               <div style={{ fontSize: 10, color: C.gray, textAlign: "right", marginTop: 3 }}>{m.time}</div>
             </div>
           ) : (
-            <div key={i} style={{ alignSelf: "flex-start", maxWidth: "78%", display: "flex", gap: 8 }}>
+            <div key={m.id || m.tempId || i} style={{ alignSelf: "flex-start", maxWidth: "78%", display: "flex", gap: 8 }}>
               <Frog mood={isDirect?"love":"calm"} size={30}/>
               <div>
                 <div style={{ background: "#fff", color: C.dark, padding: "10px 14px", borderRadius: "16px 16px 16px 4px", fontSize: 14, lineHeight: 1.5, boxShadow: SH2 }}>{m.text}</div>
