@@ -15,6 +15,7 @@ export const CACHE_KEYS = {
 
 const memoryCache = {};
 const POINT_BALANCE_PREFIX = "toad.pointBalance";
+const CHAT_CONTEXTS_KEY = "toad.chatContexts";
 export const POINT_DEFAULTS = { owner: 12000, buyer: 30000, broker: 50000 };
 
 export const getDefaultPointBalance = role => POINT_DEFAULTS[role] ?? POINT_DEFAULTS.owner;
@@ -80,6 +81,55 @@ export async function savePointBalance({ userId, balance, delta = 0, reason = "p
   } catch (error) {
     console.error("Supabase user_points save error:", error);
   }
+}
+
+const safeListingForChat = listing => ({
+  id: listing.id,
+  ownerKey: listing.ownerKey || listing.owner_key || null,
+  region: listing.region,
+  dong: listing.dong,
+  complex: listing.complex,
+  propType: listing.propType,
+  dealType: listing.dealType,
+  price: listing.price,
+  fast: !!listing.fast,
+  status: listing.status,
+  expiresInDays: listing.expiresInDays,
+});
+
+export function loadChatContexts() {
+  try {
+    if (typeof window === "undefined") return [];
+    const saved = window.localStorage.getItem(CHAT_CONTEXTS_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveChatContext(context) {
+  if (!context?.id || !context?.listing) return;
+  try {
+    const nextContext = {
+      ...context,
+      listing: safeListingForChat(context.listing),
+      updatedAt: new Date().toISOString(),
+    };
+    const rest = loadChatContexts().filter(item => item.id !== context.id);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CHAT_CONTEXTS_KEY, JSON.stringify([nextContext, ...rest].slice(0, 80)));
+    }
+  } catch {}
+}
+
+export function loadChatContextsForUser(userId, role) {
+  return loadChatContexts().filter(context => {
+    if (role === "owner") return context.listing?.ownerKey === userId;
+    if (role === "buyer") return context.buyerKey === userId;
+    if (role === "broker") return context.brokerKey === userId;
+    return false;
+  });
 }
 
 export function loadCache(key, fallback) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G, SH2 } from "../theme";
 import { CHATS } from "../data/data";
-import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
+import { CACHE_KEYS, loadCache, saveCache, loadChatContexts, loadChatContextsForUser } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
 import { isTermExpired } from "../utils/helpers";
@@ -20,21 +20,35 @@ const DEMO_TEST_CHAT = {
   ],
 };
 
-const chatFromContext = context => {
+const chatFromContext = (context, role = "buyer") => {
   if (!context?.listing) return null;
   const listing = context.listing;
   const property = `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim();
   const expired = isTermExpired(listing);
+  const direct = context.mode === "직거래";
+  const ownerView = role === "owner";
+  const partnerName = ownerView
+    ? (direct ? context.buyerName || "직거래 매수자" : context.brokerName || "공인중개사")
+    : "매물 소유주";
+  const noticeText = expired
+    ? "매물 의뢰가 만료됐어요. 연락처 조회와 공개 요청은 다시 의뢰된 뒤 가능해요."
+    : direct
+      ? `${context.buyerName || "직거래 매수자"}님이 연락처 열람 후 만든 직거래 채팅방이에요.`
+      : `${context.brokerName || "공인중개사"}님이 매물 연락처 확인 후 만든 채팅방이에요.`;
   return {
     id: context.id,
-    name: "매물 소유주",
-    office: expired ? "의뢰 만료" : listing.fast ? "연락처 확인 완료" : "연락처 비공개",
+    name: partnerName,
+    office: expired ? "의뢰 만료" : direct ? "직거래 문의" : listing.fast ? "연락처 확인 완료" : "연락처 비공개",
     property: property || "등록 매물",
     unread: 0,
     mode: context.mode || (listing.fast ? "빠른의뢰" : "안심의뢰"),
     expired,
+    ownerKey: listing.ownerKey || listing.owner_key || null,
+    buyerKey: context.buyerKey || null,
+    brokerKey: context.brokerKey || null,
+    contactRequestId: context.contactRequestId || context.id,
     messages: [
-      { from: "broker", senderKey: "toad-demo-system", senderName: "채팅 안내", text: expired ? "매물 의뢰가 만료됐어요. 연락처 조회와 공개 요청은 다시 의뢰된 뒤 가능해요." : "연락처 확인 후 생성된 매물별 채팅방이에요.", time: "방금 전" },
+      { from: "broker", senderKey: "toad-demo-system", senderName: "채팅 안내", text: noticeText, time: "방금 전" },
     ],
   };
 };
@@ -66,10 +80,10 @@ const chatPartnerProfile = (chat, role, demoUser) => {
   }
 
   return {
-    name: role === "broker" ? "매물 소유주" : "매물 등록자",
+    name: "매물 소유주",
     subtitle: `${chat.property} 관련 대화 중`,
     subtitleLines: [`${chat.property} 관련`, chat.office],
-    type: role === "broker" ? "소유주" : "상대방",
+    type: "소유주",
     office: chat.office,
     property: chat.property,
     note: `${demoUser.label} 계정으로 대화 중이에요.`,
@@ -120,14 +134,20 @@ const upsertMessageRow = (messages, row) => {
   return [...messages, next];
 };
 
-const chatsForRole = role => [
+const chatsForRole = (role, demoUser = getDemoUser()) => [
   DEMO_TEST_CHAT,
-  ...CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true),
+  ...CHATS.filter(c => {
+    if (role === "broker") return c.mode !== "직거래";
+    if (role === "buyer") return c.mode === "직거래";
+    if (role === "owner") return demoUser.id === "toad-demo-owner";
+    return false;
+  }),
 ];
 
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   const demoUser = getDemoUser();
-  const visibleChats = chatsForRole(role);
+  const savedChats = loadChatContextsForUser(demoUser.id, role).map(context => chatFromContext(context, role)).filter(Boolean);
+  const visibleChats = [...new Map([...chatsForRole(role, demoUser), ...savedChats].map(chat => [chat.id, chat])).values()];
   const [latestByThread, setLatestByThread] = useState({});
 
   useEffect(() => {
@@ -160,7 +180,7 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
 
     loadLatestMessages();
     const channel = supabase
-      .channel(`chat-list-${role}`)
+      .channel(`chat-list-${role}-${demoUser.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, payload => {
         const row = payload.new;
         if (!threadSet.has(row.thread_id)) return;
@@ -181,7 +201,7 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, [role]);
+  }, [role, demoUser.id]);
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%" }}>
@@ -220,9 +240,14 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
 }
 
 export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
-  const contextChat = chatContext?.id === chatId ? chatFromContext(chatContext) : null;
-  const chat = chatsForRole(role).find(c => c.id === chatId) || contextChat || DEMO_TEST_CHAT;
   const demoUser = getDemoUser();
+  const storedContext = chatContext?.id === chatId ? chatContext : loadChatContexts().find(context => context.id === chatId);
+  const contextChat = storedContext ? chatFromContext(storedContext, role) : null;
+  const chat = contextChat || chatsForRole(role, demoUser).find(c => c.id === chatId) || DEMO_TEST_CHAT;
+  const accessDenied =
+    (role === "owner" && chat.ownerKey && chat.ownerKey !== demoUser.id) ||
+    (role === "buyer" && chat.buyerKey && chat.buyerKey !== demoUser.id) ||
+    (role === "broker" && chat.brokerKey && chat.brokerKey !== demoUser.id);
   const decisionKey = chat.contactRequestId || chat.id;
   const [msgs, setMsgs] = useState(() => baseMessages(chat));
   const [input, setInput] = useState("");
@@ -237,6 +262,7 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
   useEffect(() => {
     let alive = true;
     setMsgs(baseMessages(chat));
+    if (accessDenied) return () => { alive = false; };
     async function loadMessages() {
       const { data, error } = await supabase
         .from("chat_messages")
@@ -268,7 +294,7 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, [chat.id]);
+  }, [chat.id, accessDenied]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
@@ -326,6 +352,20 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
       text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐어요. 연락처는 채팅 메시지에 남기지 않아요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
     });
   };
+  if (accessDenied) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
+        <div style={{ background: G.header, padding: "44px 16px 18px", flexShrink: 0 }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 900, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>← 채팅</button>
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}>
+          <Frog mood="sleepy" size={100} animate/>
+          <div style={{ fontSize: 17, fontWeight: 900, color: C.dark }}>내 채팅방이 아니에요</div>
+          <div style={{ fontSize: 13, color: C.gray, lineHeight: 1.6 }}>매물 소유주 또는 요청한 계정만 볼 수 있어요.</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
       <div style={{ background: G.header, padding: "44px 16px 14px", flexShrink: 0, boxShadow: "0 4px 16px rgba(111,184,148,.2)" }}>

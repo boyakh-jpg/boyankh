@@ -920,3 +920,21 @@ with check (true);
 ```
 
 - 실제 auth 적용 시 `user_key`는 `auth.uid()`로 바꾸고, RLS도 `user_key = auth.uid()::text` 기준으로 제한해야 한다.
+
+## 추가 인계: 매물별 채팅방 참여자 분리
+
+- 직거래 매수자 채팅은 더 이상 고정 `c3`를 열지 않는다.
+- `src/App.jsx`에서 직거래 채팅 id는 `direct-${listing.id}-${demoUser.id}` 기준이다.
+- 중개사 매물 채팅 id는 `listing-${listing.id}-${demoUser.id}` 기준이다.
+- 채팅 컨텍스트는 `src/data/cache.js`의 `toad.chatContexts` localStorage에 임시 저장한다.
+- 컨텍스트에는 `listing.ownerKey`, `buyerKey`, `brokerKey`를 저장한다.
+- `src/components/Chat.jsx`는 채팅 목록과 채팅방을 현재 테스트 아이디 기준으로 필터링한다.
+  - 소유주: `listing.ownerKey === demoUser.id`
+  - 직거래 매수자: `buyerKey === demoUser.id`
+  - 중개사: `brokerKey === demoUser.id`
+- 소유주 B 매물에서 만든 직거래 채팅은 소유주 A 채팅 목록에 나오지 않는다.
+- 잘못 열린 방은 `내 채팅방이 아니에요` 화면으로 막는다.
+- 실제 백엔드에서는 `chats`, `chat_participants`, `chat_messages` 테이블로 교체해야 한다.
+- `chat_participants`에는 `chat_id`, `user_id`, `role`, `listing_id`가 필요하다.
+- RLS는 `chat_participants.user_id = auth.uid()`인 채팅만 `select/insert` 가능하게 제한해야 한다.
+- 지금 `toad.chatContexts`는 프론트 임시 인덱스다. 다른 기기/브라우저에서는 공유되지 않는다.

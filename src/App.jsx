@@ -15,6 +15,7 @@ import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { getDemoUser } from "./data/demoUsers";
+import { saveChatContext } from "./data/cache";
 
 const loadSetting = (key, fallback) => {
   try {
@@ -41,6 +42,7 @@ const LISTING_PUBLIC_COLUMNS = "id,title,price,address,owner_key,region,dong,com
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
   mine: row.mine || row.owner_key === ownerKey,
+  ownerKey: row.ownerKey || row.owner_key || (row.mine ? ownerKey : null),
   region: row.region || "지역 미입력",
   dong: row.dong || "",
   complex: row.complex || row.title || "매물명 미입력",
@@ -181,7 +183,7 @@ export default function App() {
     contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [screen]);
   // ===== 공용 매물 store (owner/broker/buyer가 같은 데이터를 봄) =====
-  const [properties, setProperties] = useState(PROPERTIES);
+  const [properties, setProperties] = useState(() => PROPERTIES.map(p => normalizeListing(p, OWNER_KEY)));
   useEffect(() => {
     async function loadListings() {
       const { data, error } = await supabase
@@ -220,11 +222,11 @@ export default function App() {
 
     if (error) {
       console.error("Supabase insert listing error:", error);
-      setProperties(prev => [{ ...p, mine: true }, ...prev]);
+      setProperties(prev => [{ ...p, mine: true, ownerKey: demoUser.id }, ...prev]);
       return;
     }
 
-    setProperties(prev => [{ ...normalizeListing(data, demoUser.id), mine: true }, ...prev]);
+    setProperties(prev => [{ ...normalizeListing(data, demoUser.id), mine: true, ownerKey: demoUser.id }, ...prev]);
   };
   // 거래 완료/되돌리기 토글
   const setDealDone = async (id, done) => {
@@ -296,6 +298,7 @@ export default function App() {
   };
   const openChat = target => {
     if (target && typeof target === "object") {
+      saveChatContext(target);
       setActiveChat(target.id);
       setActiveChatContext(target);
     } else {
@@ -304,6 +307,21 @@ export default function App() {
     }
     setScreen("chatroom");
   };
+  const listingWithOwner = listing => ({ ...listing, ownerKey: listing.ownerKey || listing.owner_key || null });
+  const openBrokerListingChat = listing => openChat({
+    id: `listing-${listing.id}-${demoUser.id}`,
+    listing: listingWithOwner(listing),
+    mode: listing.fast ? "빠른의뢰" : "안심의뢰",
+    brokerKey: demoUser.id,
+    brokerName: demoUser.label,
+  });
+  const openDirectListingChat = listing => openChat({
+    id: `direct-${listing.id}-${demoUser.id}`,
+    listing: listingWithOwner(listing),
+    mode: "직거래",
+    buyerKey: demoUser.id,
+    buyerName: demoUser.label,
+  });
   const applyDemoUser = user => {
     setDemoUser(user);
     setRole(user.role);
@@ -321,7 +339,7 @@ export default function App() {
     if (k === "mylist") setMyListPreset({});
     setScreen(k);
   };
-  const roleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true);
+  const roleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : demoUser.id === OWNER_KEY);
   const totalUnread = roleChats.reduce((s, c) => s + c.unread, 0);
   const ownerMenus = [{ k: "home", label: "홈" }, { k: "register", label: "의뢰하기" }, { k: "offices", label: "부동산" }, { k: "chatlist", label: "채팅", badge: totalUnread }, { k: "mylist", label: "내 매물" }];
   const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
@@ -363,9 +381,9 @@ export default function App() {
           {screen === "offices" && <BrokerOffices role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
           {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={listing => openChat({ id: `listing-${listing.id}`, listing, mode: listing.fast ? "빠른의뢰" : "안심의뢰" })} openModal={setModal}/>}
-          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={() => openChat("c3")}/>}
-          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={() => openChat("c3")}/>}
+          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>}
+          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
+          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
           {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>}
