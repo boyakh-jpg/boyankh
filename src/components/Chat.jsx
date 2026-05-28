@@ -19,6 +19,40 @@ const DEMO_TEST_CHAT = {
   ],
 };
 
+const chatPartnerProfile = (chat, role, demoUser) => {
+  if (chat.demo) {
+    return {
+      name: "테스트 아이디 전체",
+      subtitle: "소유주 A/B, 중개사, 직거래 매수자와 대화 중",
+      type: "테스트 참여자",
+      office: "공용 테스트 채팅방",
+      property: chat.property,
+      note: `${demoUser.label}로 메시지를 보내고 있어요.`,
+    };
+  }
+
+  if (role === "owner") {
+    const type = chat.mode === "직거래" ? "직거래 매수자" : "공인중개사";
+    return {
+      name: chat.name,
+      subtitle: `${type}와 대화 중`,
+      type,
+      office: chat.office,
+      property: chat.property,
+      note: chat.mode === "빠른의뢰" ? "연락처 확인 후 바로 대화 중이에요." : "안심의뢰로 번호는 서로 비공개예요.",
+    };
+  }
+
+  return {
+    name: role === "broker" ? "매물 소유주" : "매물 등록자",
+    subtitle: `${chat.property} 관련 대화 중`,
+    type: role === "broker" ? "소유주" : "상대방",
+    office: chat.office,
+    property: chat.property,
+    note: `${demoUser.label} 계정으로 대화 중이에요.`,
+  };
+};
+
 const chatTime = value => {
   try {
     return new Date(value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
@@ -164,6 +198,7 @@ export function ChatRoom({ chatId, role, onBack }) {
   const decisionKey = chat.contactRequestId || chat.id;
   const [msgs, setMsgs] = useState(() => baseMessages(chat));
   const [input, setInput] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const [localContactDecision, setLocalContactDecision] = useState(() => {
     const cached = loadCache(CACHE_KEYS.contactDecisions, {});
     return cached && typeof cached === "object" && !Array.isArray(cached) ? cached[decisionKey] || null : null;
@@ -242,6 +277,7 @@ export function ChatRoom({ chatId, role, onBack }) {
   };
   const isDirect = chat.mode === "직거래";
   const isFast = chat.mode === "빠른의뢰";
+  const partner = chatPartnerProfile(chat, role, demoUser);
   const needsContactApproval = !chat.demo && !isFast;
   const canApproveContact = role === "owner";
   const contactDecision = localContactDecision;
@@ -262,19 +298,43 @@ export function ChatRoom({ chatId, role, onBack }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
       <div style={{ background: G.header, padding: "44px 16px 14px", flexShrink: 0, boxShadow: "0 4px 16px rgba(111,184,148,.2)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 900, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>← 채팅</button>
-          <Frog mood={isDirect?"love":"calm"} size={40}/>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: "#fff", fontSize: 15, fontWeight: 700 }}>{chat.name}</div>
-            <div style={{ color: "#ffffffcc", fontSize: 11 }}>{chat.office}</div>
-          </div>
+          <button onClick={() => setProfileOpen(true)} style={{ marginLeft: "auto", maxWidth: "72%", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, minWidth: 0 }}>
+            <Frog mood={isDirect?"love":"calm"} size={40}/>
+            <div style={{ minWidth: 0, textAlign: "left" }}>
+              <div style={{ color: "#fff", fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.name}</div>
+              <div style={{ color: "#ffffffcc", fontSize: 11, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partner.subtitle}</div>
+            </div>
+          </button>
         </div>
         <div style={{ background: "#ffffff26", borderRadius: 12, padding: "8px 12px", marginTop: 12, fontSize: 12, color: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ opacity: .85 }}>매물</span><span style={{ fontWeight: 600 }}>{chat.property}</span>
         </div>
         <div style={{ marginTop: 8, color: "#ffffffd9", fontSize: 11, fontWeight: 800 }}>{demoUser.label}로 대화 중</div>
       </div>
+      {profileOpen && (
+        <div onClick={() => setProfileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(29,48,38,.26)", zIndex: 40, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 430, background: "#fff", borderRadius: "24px 24px 0 0", padding: "18px 18px 24px", boxShadow: "0 -16px 34px rgba(41,64,49,.18)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: C.dark }}>상대 프로필</div>
+              <button onClick={() => setProfileOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: G.bg, color: C.gray, fontSize: 18, cursor: "pointer", fontFamily: "inherit" }}>×</button>
+            </div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
+              <div style={{ width: 54, height: 54, borderRadius: 18, background: chat.mode === "안심의뢰" ? G.greenSoft : G.goldSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Frog mood={isDirect?"love":"calm"} size={48}/></div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 900, color: C.dark }}>{partner.name}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: C.greenInk, marginTop: 2 }}>{partner.type}</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ background: G.bg, borderRadius: 14, padding: 12 }}><div style={{ fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 3 }}>소속/상태</div><div style={{ fontSize: 13, color: C.dark, fontWeight: 800 }}>{partner.office}</div></div>
+              <div style={{ background: G.bg, borderRadius: 14, padding: 12 }}><div style={{ fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 3 }}>대화 매물</div><div style={{ fontSize: 13, color: C.dark, fontWeight: 800 }}>{partner.property}</div></div>
+              <div style={{ background: G.greenSoft, borderRadius: 14, padding: 12, fontSize: 12, color: C.greenInk, fontWeight: 800, lineHeight: 1.5 }}>{partner.note}</div>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
       <div ref={listRef} style={{ height: "100%", overflowY: "auto", padding: "16px 14px 72px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ textAlign: "center", fontSize: 11, color: C.gray, background: "#ffffffcc", borderRadius: 12, padding: "6px 12px", alignSelf: "center", marginBottom: 4 }}>{isDirect ? "직거래 채팅 · 중개수수료 없음" : isFast ? "빠른의뢰 채팅 · 연락처 확인됨" : "안심의뢰 채팅 · 번호는 서로 비공개예요"}</div>

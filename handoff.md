@@ -768,3 +768,10 @@ alter publication supabase_realtime add table public.chat_messages;
 - 이미 추가된 테이블이면 위 SQL은 중복 오류가 날 수 있다.
 - RLS는 최소 개발용으로 `select`, `insert` 정책이 있어야 한다.
 - 실제 서비스에서는 `chat_participants` 기준으로 본인 참여 채팅만 `select/insert` 가능하게 제한해야 한다.
+
+## 추가 인계: 채팅 상대 프로필 UI
+
+- `src/components/Chat.jsx`의 채팅방 헤더 오른쪽 상대 정보 묶음을 누르면 상대 프로필 sheet가 열린다.
+- 현재 프로필 데이터는 `chatPartnerProfile` 프론트 데모 계산값이다.
+- 실제 서비스에서는 `chats`, `chat_participants`, `user_profiles`, `broker_profiles`, `broker_offices`를 조인해서 상대 프로필을 내려줘야 한다.
+- 테스트 채팅방은 `테스트 아이디 전체`를 상대 프로필로 표시한다.
