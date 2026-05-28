@@ -96,6 +96,10 @@ const messageFromRow = row => ({
   createdAt: row.created_at,
 });
 
+const isNoticeMessage = message =>
+  message.senderKey === "toad-demo-system" ||
+  ["채팅 안내", "테스트 안내", "연락처 요청"].includes(message.senderName);
+
 const upsertMessageRow = (messages, row) => {
   const next = messageFromRow(row);
   if (messages.some(message => message.id === next.id)) return messages;
@@ -340,23 +344,23 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
         <div style={{ marginTop: 8, color: "#ffffffd9", fontSize: 11, fontWeight: 800 }}>{demoUser.label}로 대화 중</div>
       </div>
       {profileOpen && (
-        <div onClick={() => setProfileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(29,48,38,.26)", zIndex: 40, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 430, background: "#fff", borderRadius: "24px 24px 0 0", padding: "18px 18px 24px", boxShadow: "0 -16px 34px rgba(41,64,49,.18)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div onClick={() => setProfileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(29,48,38,.26)", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, boxSizing: "border-box" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 320, background: "#fff", borderRadius: 24, padding: "16px 16px 18px", boxShadow: "0 18px 42px rgba(41,64,49,.22)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontSize: 16, fontWeight: 900, color: C.dark }}>상대 프로필</div>
               <button onClick={() => setProfileOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: G.bg, color: C.gray, fontSize: 18, cursor: "pointer", fontFamily: "inherit" }}>×</button>
             </div>
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
-              <div style={{ width: 54, height: 54, borderRadius: 18, background: chat.mode === "안심의뢰" ? G.greenSoft : G.goldSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Frog mood={isDirect?"love":"calm"} size={48}/></div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 16, background: chat.mode === "안심의뢰" ? G.greenSoft : G.goldSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Frog mood={isDirect?"love":"calm"} size={42}/></div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 17, fontWeight: 900, color: C.dark }}>{partner.name}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: C.dark }}>{partner.name}</div>
                 <div style={{ fontSize: 12, fontWeight: 800, color: C.greenInk, marginTop: 2 }}>{partner.type}</div>
               </div>
             </div>
             <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ background: G.bg, borderRadius: 14, padding: 12 }}><div style={{ fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 3 }}>소속/상태</div><div style={{ fontSize: 13, color: C.dark, fontWeight: 800 }}>{partner.office}</div></div>
-              <div style={{ background: G.bg, borderRadius: 14, padding: 12 }}><div style={{ fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 3 }}>대화 매물</div><div style={{ fontSize: 13, color: C.dark, fontWeight: 800 }}>{partner.property}</div></div>
-              <div style={{ background: G.greenSoft, borderRadius: 14, padding: 12, fontSize: 12, color: C.greenInk, fontWeight: 800, lineHeight: 1.5 }}>{partner.note}</div>
+              <div style={{ background: G.bg, borderRadius: 13, padding: 10 }}><div style={{ fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 3 }}>소속/상태</div><div style={{ fontSize: 13, color: C.dark, fontWeight: 800 }}>{partner.office}</div></div>
+              <div style={{ background: G.bg, borderRadius: 13, padding: 10 }}><div style={{ fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 3 }}>대화 매물</div><div style={{ fontSize: 13, color: C.dark, fontWeight: 800 }}>{partner.property}</div></div>
+              <div style={{ background: G.greenSoft, borderRadius: 13, padding: 10, fontSize: 12, color: C.greenInk, fontWeight: 800, lineHeight: 1.5 }}>{partner.note}</div>
             </div>
           </div>
         </div>
@@ -379,6 +383,20 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
         {msgs.map((m, i) => {
           const mine = m.senderKey ? m.senderKey === demoUser.id : m.from === "me";
           const senderName = m.senderName || (mine ? demoUser.label : chat.name);
+          const notice = isNoticeMessage(m);
+          if (notice) {
+            const requestNotice = senderName === "연락처 요청";
+            return (
+              <div key={m.id || m.tempId || i} style={{ alignSelf: "center", width: "92%", background: requestNotice ? G.goldSoft : G.greenSoft, border: `1px solid ${requestNotice ? C.gold : C.green}`, borderRadius: 16, padding: "12px 13px", boxShadow: SH2, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ width: 34, height: 34, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Frog mood={requestNotice ? "nervous" : "pondering"} size={30}/></div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12, color: requestNotice ? C.goldInk : C.greenInk, fontWeight: 900, marginBottom: 4 }}>{senderName || "공지"}</div>
+                  <div style={{ fontSize: 13, color: C.dark, fontWeight: 700, lineHeight: 1.5 }}>{m.text}</div>
+                  <div style={{ fontSize: 10, color: C.gray, marginTop: 5 }}>{m.time}</div>
+                </div>
+              </div>
+            );
+          }
           return mine ? (
             <div key={m.id || m.tempId || i} style={{ alignSelf: "flex-end", maxWidth: "76%" }}>
               <div style={{ fontSize: 10, color: C.greenInk, textAlign: "right", fontWeight: 900, margin: "0 4px 3px" }}>나 · {senderName}</div>
@@ -387,7 +405,7 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
             </div>
           ) : (
             <div key={m.id || m.tempId || i} style={{ alignSelf: "flex-start", maxWidth: "78%", display: "flex", gap: 8 }}>
-              <Frog mood={isDirect?"love":"calm"} size={30}/>
+              <button onClick={() => setProfileOpen(true)} aria-label="상대 프로필" style={{ border: "none", background: "none", padding: 0, cursor: "pointer", alignSelf: "flex-start", fontFamily: "inherit", lineHeight: 0 }}><Frog mood={isDirect?"love":"calm"} size={30}/></button>
               <div>
                 <div style={{ fontSize: 10, color: C.greenInk, fontWeight: 900, margin: "0 0 3px 2px" }}>{senderName}</div>
                 <div style={{ background: "#fff", color: C.dark, padding: "10px 14px", borderRadius: "16px 16px 16px 4px", fontSize: 14, lineHeight: 1.5, boxShadow: SH2 }}>{m.text}</div>
