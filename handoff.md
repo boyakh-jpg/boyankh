@@ -775,3 +775,6 @@ alter publication supabase_realtime add table public.chat_messages;
 - 현재 프로필 데이터는 `chatPartnerProfile` 프론트 데모 계산값이다.
 - 실제 서비스에서는 `chats`, `chat_participants`, `user_profiles`, `broker_profiles`, `broker_offices`를 조인해서 상대 프로필을 내려줘야 한다.
 - 테스트 채팅방은 `테스트 아이디 전체`를 상대 프로필로 표시한다.
+- 테스트 채팅방은 단체방 기준이다.
+- 채팅방 헤더 큰제목은 채팅방명으로 고정하고, 작은제목은 참여자/방 설명을 2줄로 표시한다.
+- 말풍선 위에는 `sender_name`을 표시해서 누가 말했는지 구분한다.

@@ -24,6 +24,7 @@ const chatPartnerProfile = (chat, role, demoUser) => {
     return {
       name: "테스트 아이디 전체",
       subtitle: "소유주 A/B, 중개사, 직거래 매수자와 대화 중",
+      subtitleLines: ["소유주 A/B · 중개사 · 직거래 매수자", "테스트 단체방"],
       type: "테스트 참여자",
       office: "공용 테스트 채팅방",
       property: chat.property,
@@ -36,6 +37,7 @@ const chatPartnerProfile = (chat, role, demoUser) => {
     return {
       name: chat.name,
       subtitle: `${type}와 대화 중`,
+      subtitleLines: [`${type}와 대화 중`, chat.office],
       type,
       office: chat.office,
       property: chat.property,
@@ -46,6 +48,7 @@ const chatPartnerProfile = (chat, role, demoUser) => {
   return {
     name: role === "broker" ? "매물 소유주" : "매물 등록자",
     subtitle: `${chat.property} 관련 대화 중`,
+    subtitleLines: [`${chat.property} 관련`, chat.office],
     type: role === "broker" ? "소유주" : "상대방",
     office: chat.office,
     property: chat.property,
@@ -278,6 +281,7 @@ export function ChatRoom({ chatId, role, onBack }) {
   const isDirect = chat.mode === "직거래";
   const isFast = chat.mode === "빠른의뢰";
   const partner = chatPartnerProfile(chat, role, demoUser);
+  const headerSubtitleLines = partner.subtitleLines || [partner.subtitle];
   const needsContactApproval = !chat.demo && !isFast;
   const canApproveContact = role === "owner";
   const contactDecision = localContactDecision;
@@ -304,7 +308,11 @@ export function ChatRoom({ chatId, role, onBack }) {
             <Frog mood={isDirect?"love":"calm"} size={40}/>
             <div style={{ minWidth: 0, textAlign: "left" }}>
               <div style={{ color: "#fff", fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.name}</div>
-              <div style={{ color: "#ffffffcc", fontSize: 11, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partner.subtitle}</div>
+              <div style={{ color: "#ffffffcc", fontSize: 11, fontWeight: 700, lineHeight: 1.35 }}>
+                {headerSubtitleLines.map(line => (
+                  <div key={line} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{line}</div>
+                ))}
+              </div>
             </div>
           </button>
         </div>
@@ -352,8 +360,10 @@ export function ChatRoom({ chatId, role, onBack }) {
         </div>}
         {msgs.map((m, i) => {
           const mine = m.senderKey ? m.senderKey === demoUser.id : m.from === "me";
+          const senderName = m.senderName || (mine ? demoUser.label : chat.name);
           return mine ? (
             <div key={m.id || m.tempId || i} style={{ alignSelf: "flex-end", maxWidth: "76%" }}>
+              <div style={{ fontSize: 10, color: C.greenInk, textAlign: "right", fontWeight: 900, margin: "0 4px 3px" }}>나 · {senderName}</div>
               <div style={{ background: G.header, color: "#fff", padding: "10px 14px", borderRadius: "16px 16px 4px 16px", fontSize: 14, lineHeight: 1.5, boxShadow: SH2 }}>{m.text}</div>
               <div style={{ fontSize: 10, color: C.gray, textAlign: "right", marginTop: 3 }}>{m.time}</div>
             </div>
@@ -361,8 +371,9 @@ export function ChatRoom({ chatId, role, onBack }) {
             <div key={m.id || m.tempId || i} style={{ alignSelf: "flex-start", maxWidth: "78%", display: "flex", gap: 8 }}>
               <Frog mood={isDirect?"love":"calm"} size={30}/>
               <div>
+                <div style={{ fontSize: 10, color: C.greenInk, fontWeight: 900, margin: "0 0 3px 2px" }}>{senderName}</div>
                 <div style={{ background: "#fff", color: C.dark, padding: "10px 14px", borderRadius: "16px 16px 16px 4px", fontSize: 14, lineHeight: 1.5, boxShadow: SH2 }}>{m.text}</div>
-                <div style={{ fontSize: 10, color: C.gray, marginTop: 3, display: "flex", gap: 6 }}>{m.time}{m.senderName && <span style={{ color: C.greenInk }}>· {m.senderName}</span>}{m.isDefault && <span style={{ color: C.greenInk }}>· 기본 인사말</span>}</div>
+                <div style={{ fontSize: 10, color: C.gray, marginTop: 3, display: "flex", gap: 6 }}>{m.time}{m.isDefault && <span style={{ color: C.greenInk }}>· 기본 인사말</span>}</div>
               </div>
             </div>
           );
