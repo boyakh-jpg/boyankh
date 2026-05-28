@@ -247,7 +247,7 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
           </div>
         )}
         <div style={{ background: G.header, padding: "46px 20px 22px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)" }}>
-          <button onClick={() => setView(null)} style={{ background: "none", border: "none", color: "#fff", fontSize: 24, cursor: "pointer", padding: 0, marginBottom: 8 }}>←</button>
+          <button onClick={() => setView(null)} style={{ background: "none", border: "none", color: "#fff", fontSize: 13, fontWeight: 900, cursor: "pointer", padding: 0, marginBottom: 8, fontFamily: "inherit" }}>← 내 매물</button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ color: "#fff", fontSize: 18, fontWeight: 800 }}>{l.addr}</div>
             {done && <span style={{ background: "#ffffff2e", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 8 }}>{l.doneLabel}</span>}
