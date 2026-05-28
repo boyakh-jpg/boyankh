@@ -302,7 +302,7 @@ export default function App() {
   const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
   const buyerMenus = [{ k: "home", label: "홈" }, { k: "buyer", label: "매물" }, { k: "buyerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
   const menus = role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus;
-  const noMenu = ["splash", "login", "role", "register", "chatroom", "settings"].includes(screen);
+  const noMenu = ["splash", "login", "role", "register", "chatroom"].includes(screen);
   const lightHeader = ["login", "role"].includes(screen);
   // 하단 메뉴 아이콘: 미니멀 도형
   const MenuIcon = ({ active }) => (<div style={{ width: 18, height: 18, borderRadius: 6, background: active ? C.green : "transparent", border: `2px solid ${active ? C.green : C.gray}`, transition: "all .15s" }}/>);
