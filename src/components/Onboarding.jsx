@@ -36,9 +36,6 @@ export function Login({ onLogin }) {
         <button onClick={() => onLogin("user")} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "#5FC97E", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 6px 16px rgba(95,201,126,.32)" }}>
           <span style={{ fontWeight: 900, fontSize: 18 }}>N</span>네이버로 시작하기
         </button>
-        <button onClick={() => onLogin("broker")} style={{ width: "100%", padding: "14px 0", borderRadius: 16, border: `1.5px solid ${C.green}`, background: "#fff", color: C.greenInk, fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-          중개사로 시작하기
-        </button>
       </div>
       <div style={{ padding: 18, background: G.greenSoft, borderRadius: 18, width: "100%", boxSizing: "border-box", boxShadow: SH2 }}>
         <div style={{ fontSize: 12, color: C.greenInk, fontWeight: 700, marginBottom: 6 }}>개인정보 보호 안내</div>
@@ -49,12 +46,12 @@ export function Login({ onLogin }) {
 }
 
 // ===== 역할 선택 =====
-export function Role({ accountType = "user", onSelect }) {
+export function Role({ accountType = "user", availableRoles = null, onSelect }) {
   const roles = [
     { role: "owner", tone: "green", title: "팔거나 임대할래요", sub: "매도 / 전세 / 월세 의뢰", badge: null },
     { role: "broker", tone: "gold", title: "공인중개사예요", sub: "매물 확인 · 가입 시 50,000P", badge: "FREE 50,000P" },
     { role: "buyer", tone: "lilac", title: "구하고 있어요", sub: "직거래 매물 검색 · 열람 1건 10,000P", badge: null },
-  ].filter(item => accountType === "broker" || item.role !== "broker");
+  ].filter(item => availableRoles ? availableRoles.includes(item.role) : accountType === "broker" || item.role !== "broker");
   return (
     <div style={{ padding: "34px 24px", background: G.pageBg, minHeight: "100%", boxSizing: "border-box" }}>
       <div style={{ textAlign: "center", marginBottom: 22 }}>

@@ -357,7 +357,7 @@ export default function App() {
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {screen === "splash" && <Splash onNext={() => setScreen("login")}/>}
           {screen === "login" && <Login onLogin={type => { setAccountType(type); setScreen("role"); }}/>}
-          {screen === "role" && <Role accountType={accountType} onSelect={r => { setRole(r); setScreen("home"); }}/>}
+          {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
           {screen === "home" && <Home properties={properties} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "offices" && <BrokerOffices role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
