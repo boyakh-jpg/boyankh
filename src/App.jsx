@@ -31,6 +31,11 @@ const saveSetting = (key, value) => {
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
 };
+const roleAccessFor = (demoRole, accountType) => {
+  if (demoRole === "broker" || accountType === "broker") return ["broker", "owner"];
+  if (demoRole === "buyer") return ["buyer", "owner"];
+  return ["owner", "buyer"];
+};
 const OWNER_KEY = "toad-demo-owner";
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
@@ -280,7 +285,7 @@ export default function App() {
     setProperties(prev => prev.map(p => p.id === id ? { ...p, ...nextPatch } : p));
   };
   const closeModal = () => setModal(null);
-  const availableRoles = [demoUser.role];
+  const availableRoles = roleAccessFor(demoUser.role, accountType);
   const switchRole = () => {
     if (availableRoles.length < 2) return;
     const nr = availableRoles[(availableRoles.indexOf(role) + 1) % availableRoles.length];
@@ -321,6 +326,8 @@ export default function App() {
   const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
   const buyerMenus = [{ k: "home", label: "홈" }, { k: "buyer", label: "매물" }, { k: "buyerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
   const menus = role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus;
+  const roleLabel = { owner: "소유주", broker: "중개사", buyer: "직거래" };
+  const nextRole = availableRoles[(availableRoles.indexOf(role) + 1) % availableRoles.length] || availableRoles[0];
   const noMenu = ["splash", "login", "role", "register", "chatroom"].includes(screen);
   const lightHeader = ["login", "role"].includes(screen);
   // 하단 메뉴 아이콘: 미니멀 도형
@@ -367,7 +374,7 @@ export default function App() {
               <Frog mood="sleepy" size={110} animate/>
               <div style={{ fontSize: 16, fontWeight: 800, color: C.dark }}>준비 중이에요</div>
               <div style={{ fontSize: 13, color: C.gray }}>곧 업데이트될 예정이에요</div>
-              <button onClick={switchRole} style={{ marginTop: 12, background: G.greenSoft, border: `1.5px solid ${C.green}`, borderRadius: 20, padding: "10px 20px", color: C.greenInk, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{role === "broker" ? "소유주로 전환" : "중개사로 전환"}</button>
+              <button onClick={switchRole} style={{ marginTop: 12, background: G.greenSoft, border: `1.5px solid ${C.green}`, borderRadius: 20, padding: "10px 20px", color: C.greenInk, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{roleLabel[nextRole]}로 전환</button>
             </div>
           )}
         </div>

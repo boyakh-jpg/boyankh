@@ -795,3 +795,11 @@ alter publication supabase_realtime add table public.chat_messages;
 - 중개사가 매물에서 채팅을 누르면 기존 고정 `c4`가 아니라 `listing-{listing.id}` thread_id로 매물별 채팅방을 연다.
 - `src/components/Chat.jsx`는 `chatContext.listing`이 있으면 매물별 채팅방 메타데이터를 프론트에서 임시 생성한다.
 - 실제 서비스에서는 `chats`, `chat_participants`, `chat_messages` 생성 API가 먼저 실행된 뒤 서버의 chat id를 받아 열어야 한다.
+
+## 추가 인계: 역할 토글 허용 기준
+
+- `src/App.jsx`의 `roleAccessFor` 기준:
+  - 소유주/직거래 계정: `소유주 ↔ 직거래`
+  - 중개사 계정: `중개사 ↔ 소유주`
+- `중개사 ↔ 직거래` 직접 토글은 허용하지 않는다.
+- 실제 서비스에서는 사용자별 복수 역할 권한 테이블 기준으로 메뉴 접근을 계산해야 한다.
