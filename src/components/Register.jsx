@@ -130,7 +130,7 @@ export function Register({ onDone, onClose, onBack }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
       <div style={{ padding: "46px 20px 8px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={back} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: C.mid, padding: 0 }}>←</button>
+          <button onClick={back} style={{ background: "none", border: "none", fontSize: 13, fontWeight: 900, cursor: "pointer", color: C.mid, padding: 0, fontFamily: "inherit" }}>← 이전</button>
           <div style={{ flex: 1 }}><Dots total={TOTAL} current={step}/></div>
           <div style={{ fontSize: 12, color: C.gray }}>{step+1}/{TOTAL}</div>
         </div>
