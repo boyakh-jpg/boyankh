@@ -323,7 +323,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
           <MenuRow title="포인트/결제" sub="충전 내역, 사용 내역, 결제수단" onClick={() => setAccountPage("payments")}/>
           <MenuRow title="고객지원" sub="문의하기, 신고하기, 약관" onClick={() => setAccountPage("support")}/>
         </Section>
-        <button onClick={onBack} style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 16, padding: "14px 0", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: SH2 }}>설정 저장</button>
+        <BackButton label="뒤로가기" onClick={onBack}/>
       </div>}
     </div>
   );
