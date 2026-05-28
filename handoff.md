@@ -753,3 +753,18 @@ add column if not exists owner_key text;
 - GitHub `main`의 `package.json`에 `@supabase/supabase-js`를 추가했다.
 - `package-lock.json`은 아직 갱신되지 않았다.
 - StackBlitz에서 `npm install`을 실행하면 lockfile이 갱신된다.
+
+## 추가 인계: Supabase Realtime 채팅 설정
+
+- `src/components/Chat.jsx`는 `chat_messages` INSERT를 Supabase Realtime `postgres_changes`로 구독한다.
+- 채팅방 내부와 채팅 목록 마지막 메시지 모두 INSERT 이벤트로 갱신한다.
+- Supabase에서 `chat_messages` 테이블이 Realtime publication에 포함되어야 실시간 반영된다.
+- 필요 SQL:
+
+```sql
+alter publication supabase_realtime add table public.chat_messages;
+```
+
+- 이미 추가된 테이블이면 위 SQL은 중복 오류가 날 수 있다.
+- RLS는 최소 개발용으로 `select`, `insert` 정책이 있어야 한다.
+- 실제 서비스에서는 `chat_participants` 기준으로 본인 참여 채팅만 `select/insert` 가능하게 제한해야 한다.

@@ -42,6 +42,23 @@ const messageFromRow = row => ({
   createdAt: row.created_at,
 });
 
+const upsertMessageRow = (messages, row) => {
+  const next = messageFromRow(row);
+  if (messages.some(message => message.id === next.id)) return messages;
+
+  const tempIndex = messages.findIndex(message =>
+    message.tempId &&
+    message.senderKey === next.senderKey &&
+    message.text === next.text
+  );
+
+  if (tempIndex >= 0) {
+    return messages.map((message, index) => index === tempIndex ? next : message);
+  }
+
+  return [...messages, next];
+};
+
 const chatsForRole = role => [
   DEMO_TEST_CHAT,
   ...CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true),
@@ -54,8 +71,9 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
 
   useEffect(() => {
     let alive = true;
+    const threadIds = visibleChats.map(c => c.id);
+    const threadSet = new Set(threadIds);
     async function loadLatestMessages() {
-      const threadIds = visibleChats.map(c => c.id);
       if (!threadIds.length) return;
       const { data, error } = await supabase
         .from("chat_messages")
@@ -80,7 +98,28 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
     }
 
     loadLatestMessages();
-    return () => { alive = false; };
+    const channel = supabase
+      .channel(`chat-list-${role}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, payload => {
+        const row = payload.new;
+        if (!threadSet.has(row.thread_id)) return;
+        setLatestByThread(prev => ({
+          ...prev,
+          [row.thread_id]: {
+            senderName: row.sender_name,
+            text: row.body,
+            time: chatTime(row.created_at),
+          },
+        }));
+      })
+      .subscribe(status => {
+        if (status === "CHANNEL_ERROR") console.error("Supabase chat_messages realtime list error");
+      });
+
+    return () => {
+      alive = false;
+      supabase.removeChannel(channel);
+    };
   }, [role]);
 
   return (
@@ -153,7 +192,19 @@ export function ChatRoom({ chatId, role, onBack }) {
     }
 
     loadMessages();
-    return () => { alive = false; };
+    const channel = supabase
+      .channel(`chat-room-${chat.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `thread_id=eq.${chat.id}` }, payload => {
+        setMsgs(current => upsertMessageRow(current, payload.new));
+      })
+      .subscribe(status => {
+        if (status === "CHANNEL_ERROR") console.error("Supabase chat_messages realtime room error");
+      });
+
+    return () => {
+      alive = false;
+      supabase.removeChannel(channel);
+    };
   }, [chat.id]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
@@ -175,7 +226,12 @@ export function ChatRoom({ chatId, role, onBack }) {
       return;
     }
 
-    setMsgs(m => m.map(message => message.tempId === tempId ? messageFromRow(data) : message));
+    setMsgs(m => {
+      if (m.some(message => message.id === data.id)) {
+        return m.filter(message => message.tempId !== tempId);
+      }
+      return m.map(message => message.tempId === tempId ? messageFromRow(data) : message);
+    });
   };
 
   const send = () => {
