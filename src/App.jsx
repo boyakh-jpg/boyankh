@@ -38,11 +38,16 @@ const roleAccessFor = (demoRole, accountType) => {
   return ["owner", "buyer"];
 };
 const OWNER_KEY = "toad-demo-owner";
+const demoOwnerPhoneFor = id => {
+  const n = String(id || "demo").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return `010-${String(2300 + (n % 7000)).padStart(4, "0")}-${String(1000 + ((n * 17) % 9000)).padStart(4, "0")}`;
+};
 const LISTING_PUBLIC_COLUMNS = "id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo";
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
   mine: row.mine || row.owner_key === ownerKey,
   ownerKey: row.ownerKey || row.owner_key || (row.mine ? ownerKey : null),
+  ownerPhone: row.ownerPhone || row.owner_phone || demoOwnerPhoneFor(row.id),
   region: row.region || "지역 미입력",
   dong: row.dong || "",
   complex: row.complex || row.title || "매물명 미입력",

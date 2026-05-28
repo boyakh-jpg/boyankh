@@ -34,6 +34,9 @@ const makeTenantInfo = (p, idx) => {
   };
 };
 
+const DEMO_OWNER_PHONES = ["010-2384-1027", "010-5192-7741", "010-7640-3318", "010-4268-5903", "010-9021-6475"];
+const makeOwnerPhone = (p, idx) => p.ownerPhone || DEMO_OWNER_PHONES[idx % DEMO_OWNER_PHONES.length];
+
 const RAW_PROPERTIES = [
   { id: "p1", region: "서초구", dong: "반포동", complex: "아이파크", propType: "빌라", dealType: "월세", price: "1억/74만", priceNum: 10000, area: 84, floor: 19, fee: "0.3%", fast: false, views: 30, ago: "12분 전", x: 51, y: 56, badge: null, status: "done", doneLabel: "임대완료", completedDaysAgo: 1 },
   { id: "p2", region: "영등포구", dong: "여의도동", complex: "더샵 2단지", propType: "토지", dealType: "매매", price: "22억 4,477만", priceNum: 224477, area: 133, floor: 2, fee: "0.5%", fast: false, views: 9, ago: "어제", x: 30, y: 50, badge: null, status: "done", doneLabel: "매도완료", completedDaysAgo: 4 },
@@ -139,6 +142,7 @@ const RAW_PROPERTIES = [
 export const PROPERTIES = RAW_PROPERTIES.map((p, i) => ({
   ...p,
   ...makeTenantInfo(p, i),
+  ownerPhone: makeOwnerPhone(p, i),
   createdDaysAgo: p.createdDaysAgo ?? agoToDays(p.ago),
   completedDaysAgo: p.status === "done" ? (p.completedDaysAgo ?? (i % 29)) : null,
   expiresInDays: p.expiresInDays ?? Math.max(1, 14 - (i % 13)),

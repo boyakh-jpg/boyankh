@@ -192,6 +192,16 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     return Number(p.tenantMonthly) > 0 ? `${deposit}/${Number(p.tenantMonthly).toLocaleString()}만` : deposit;
   };
   const leaseBadge = p => p.dealType === "매매" && p.tenant === "있어요" ? (Number(p.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
+  const ownerPhoneFor = p => p.ownerPhone || p.owner_phone || "010-2300-3891";
+  const ContactOpenBox = ({ listing }) => (
+    <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 900 }}>소유주 연락처</span>
+        <span style={{ fontSize: 15, color: C.dark, fontWeight: 900 }}>{ownerPhoneFor(listing)}</span>
+      </div>
+      <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "11px 0", background: "#fff", border: `1.5px solid ${C.gold}`, borderRadius: 12, color: C.goldInk, fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>채팅 걸기</button>
+    </div>
+  );
   const openPay = p => {
     if (isTermExpired(p)) {
       showToast("매물 의뢰가 만료됐어요 · 연락처 요청 불가");
@@ -287,7 +297,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
           ) : expired ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 요청 불가</div>
           ) : open ? (
-            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>연락처 확인 완료 · 채팅 걸기</button>
+            <ContactOpenBox listing={listing}/>
           ) : requested ? (
             <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>채팅방 열기 · 승인 대기</button>
           ) : (
@@ -326,7 +336,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
         ) : expired ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#7B8580", fontWeight: 700, textAlign: "center" }}>매물 의뢰가 만료됐어요 · 연락처 요청 불가</div>
         ) : open ? (
-          <button onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(p); }} style={{ width: "100%", background: G.greenSoft, border: "none", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: C.greenInk, fontWeight: 800, textAlign: "center", cursor: "pointer", fontFamily: "inherit" }}>연락처 확인 완료 · 채팅 걸기</button>
+          <ContactOpenBox listing={p}/>
         ) : requested ? (
           <button onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(p); }} style={{ width: "100%", background: G.greenSoft, border: "none", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: C.greenInk, fontWeight: 800, textAlign: "center", cursor: "pointer", fontFamily: "inherit" }}>채팅방 열기 · 승인 대기 중</button>
         ) : (

@@ -224,6 +224,16 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
     return Number(l.tenantMonthly) > 0 ? `${deposit}/${Number(l.tenantMonthly).toLocaleString()}만` : deposit;
   };
   const leaseBadge = l => l.dealType === "매매" && l.tenant === "있어요" ? (Number(l.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
+  const ownerPhoneFor = l => l.ownerPhone || l.owner_phone || "010-2300-3891";
+  const ContactOpenBox = ({ listing }) => (
+    <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 900 }}>소유주 연락처</span>
+        <span style={{ fontSize: 15, color: C.dark, fontWeight: 900 }}>{ownerPhoneFor(listing)}</span>
+      </div>
+      <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "11px 0", background: "#fff", border: `1.5px solid ${C.gold}`, borderRadius: 12, color: C.goldInk, fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>채팅하기</button>
+    </div>
+  );
   const DetailSheet = ({ listing }) => {
     const done = isDone(listing);
     const expired = isTermExpired(listing);
@@ -294,6 +304,8 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>거래 완료된 매물</div>
           ) : expired ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
+          ) : contacted[listing.id] && listing.fast ? (
+            <ContactOpenBox listing={listing}/>
           ) : contacted[listing.id] ? (
             <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 확인 완료 · 채팅하기" : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
           ) : (
@@ -343,6 +355,8 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
           </div>
         ) : expired ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "11px 14px", textAlign: "center", color: "#7B8580", fontWeight: 700, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
+        ) : contacted[l.id] && l.fast ? (
+          <ContactOpenBox listing={l}/>
         ) : contacted[l.id] ? (
           <div onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(l); }} style={{ background: G.greenSoft, borderRadius: 12, padding: "12px 0", textAlign: "center", color: C.greenInk, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{l.fast ? "연락처 확인 완료 · 채팅하기" : "채팅방 열기 · 승인 대기 중"}</div>
         ) : (

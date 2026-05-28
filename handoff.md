@@ -938,3 +938,14 @@ with check (true);
 - `chat_participants`에는 `chat_id`, `user_id`, `role`, `listing_id`가 필요하다.
 - RLS는 `chat_participants.user_id = auth.uid()`인 채팅만 `select/insert` 가능하게 제한해야 한다.
 - 지금 `toad.chatContexts`는 프론트 임시 인덱스다. 다른 기기/브라우저에서는 공유되지 않는다.
+
+## 추가 인계: 빠른의뢰 연락처 표시 더미
+
+- `src/data/data.js`의 데모 매물에 `ownerPhone`을 추가했다.
+- Supabase row에 연락처 컬럼이 없어도 `src/App.jsx`의 `normalizeListing`에서 데모 연락처를 만든다.
+- 중개사/직거래가 빠른의뢰 연락처를 열람하면 카드와 상세 sheet에 `소유주 연락처`를 표시한다.
+- 안심의뢰는 기존처럼 연락처를 바로 표시하지 않고 승인 대기/채팅 흐름만 보여준다.
+- 현재 연락처는 프론트 데모값이다.
+- 실제 백엔드에서는 공개 listings 조회에 `owner_phone`을 넣으면 안 된다.
+- 실제 연락처 표시는 `contact_unlocks` 권한 확인 후 서버 RPC/API가 반환해야 한다.
+- 만료 매물은 연락처 표시/조회 API가 계속 차단되어야 한다.
