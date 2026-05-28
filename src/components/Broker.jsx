@@ -4,6 +4,7 @@ import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/dat
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
 import { getDemoUser } from "../data/demoUsers";
+import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, savePointBalance } from "../data/cache";
 
 function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
@@ -51,7 +52,8 @@ const saveStoredMap = (key, value) => {
 export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all", role, availableRoles, tier = "골드", onSwitchRole, onOpenChat, openModal }) {
   const demoUser = getDemoUser();
   const cacheKey = name => `toad.${demoUser.id}.${name}`;
-  const [points, setPoints] = useState(50000);
+  const pointDefault = getDefaultPointBalance(demoUser.role);
+  const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
   const [contacted, setContacted] = useState(() => loadStoredMap(cacheKey("brokerContacted")));
   const [safeRequests, setSafeRequests] = useState(() => loadStoredMap(cacheKey("brokerSafeRequests")));
   const [favorites, setFavorites] = useState(() => loadStoredMap(cacheKey("brokerFavorites")));
@@ -78,6 +80,19 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const tierBonusRate = { 무료: 0, 실버: 0.05, 골드: 0.1 }[tier] || 0;
   const tierCost = { 무료: { fast: 2000, safe: 1000 }, 실버: { fast: 1900, safe: 950 }, 골드: { fast: 1800, safe: 900 } }[tier] || { fast: 2000, safe: 1000 };
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2000); };
+  useEffect(() => {
+    let alive = true;
+    setPoints(loadLocalPointBalance(demoUser.id, pointDefault));
+    loadPointBalance({ userId: demoUser.id, defaultBalance: pointDefault }).then(balance => {
+      if (alive) setPoints(balance);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id, pointDefault]);
+  const updatePoints = (updater, reason) => setPoints(prev => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    savePointBalance({ userId: demoUser.id, balance: next, delta: next - prev, reason });
+    return next;
+  });
   const updateStoredMap = (name, setter, updater) => setter(prev => {
     const next = typeof updater === "function" ? updater(prev) : updater;
     saveStoredMap(cacheKey(name), next);
@@ -103,7 +118,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const changeRegion = v => { setRegion(v); setRegionGroup([]); setDong("전체"); };
   const charge = amount => {
     const bonus = Math.round(amount * tierBonusRate);
-    setPoints(p => p + amount + bonus);
+    updatePoints(p => p + amount + bonus, "broker_point_charge");
     setChargeOpen(false);
     showToast(`${(amount + bonus).toLocaleString()}P 충전 완료 · ${tier} 보너스 적용`);
   };
@@ -119,7 +134,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
       return;
     }
     if (needPoints(tierCost.fast)) return;
-    setPoints(p => p - tierCost.fast);
+    updatePoints(p => p - tierCost.fast, "broker_fast_contact");
     markContacted(l.id);
     markViewed(l.id);
     showToast(`연락처 확인 완료 · ${tierCost.fast.toLocaleString()}P 차감`);
@@ -130,7 +145,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
       return;
     }
     if (needPoints(tierCost.safe)) return;
-    openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { setPoints(p => p - tierCost.safe); markContacted(l.id); markSafeRequest(l.id, "pending"); markViewed(l.id); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
+    openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { updatePoints(p => p - tierCost.safe, "broker_safe_request"); markContacted(l.id); markSafeRequest(l.id, "pending"); markViewed(l.id); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
   };
   const openEdit = () => openModal({ type: "editMsg", payload: defaultMsg, onConfirm: m => { setDefaultMsg(m); showToast("기본 메시지 저장됨"); } });
   useEffect(() => {

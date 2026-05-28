@@ -3,6 +3,8 @@ import { C, G, SH1, SH2, spring } from "../theme";
 import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/data";
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Frog, Tag } from "./common";
+import { getDemoUser } from "../data/demoUsers";
+import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, savePointBalance } from "../data/cache";
 
 
 function MultiFilter({ label, options, values, onToggle, tone = "gold" }) {
@@ -36,6 +38,8 @@ function MultiFilter({ label, options, values, onToggle, tone = "gold" }) {
 const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.includes(v));
 
 export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = "all", onSwitchRole, availableRoles, viewerRole = "buyer", openModal, onOpenChat }) {
+  const demoUser = getDemoUser();
+  const pointDefault = getDefaultPointBalance(demoUser.role);
   const [hideViewed, setHideViewed] = useState(true);
   const maxListPrice = Math.ceil(Math.max(...properties.map(p => p.priceNum || 0), 100000) / 10000) * 10000;
   const [sido, setSido] = useState("서울특별시");
@@ -56,11 +60,24 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   const [favorites, setFavorites] = useState({});
   const [unlocked, setUnlocked] = useState({});
   const [requests, setRequests] = useState({});
-  const [points, setPoints] = useState(30000);
+  const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notes, setNotes] = useState({});        // 매물별 메모
   const [toast, setToast] = useState("");
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2000); };
+  useEffect(() => {
+    let alive = true;
+    setPoints(loadLocalPointBalance(demoUser.id, pointDefault));
+    loadPointBalance({ userId: demoUser.id, defaultBalance: pointDefault }).then(balance => {
+      if (alive) setPoints(balance);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id, pointDefault]);
+  const updatePoints = (updater, reason) => setPoints(prev => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    savePointBalance({ userId: demoUser.id, balance: next, delta: next - prev, reason });
+    return next;
+  });
   const toggleFavorite = id => setFavorites(v => ({ ...v, [id]: !v[id] }));
   const chargeOptions = [10000, 30000, 50000, 100000];
   const buyerBonusRate = amount => amount >= 100000 ? 0.1 : amount >= 50000 ? 0.05 : amount >= 30000 ? 0.03 : 0;
@@ -99,7 +116,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   const priceMaxPct = (priceMaxSlider / PRICE_SLIDER_MAX) * 100;
   const charge = amount => {
     const bonus = Math.round(amount * buyerBonusRate(amount));
-    setPoints(p => p + amount + bonus);
+    updatePoints(p => p + amount + bonus, "buyer_point_charge");
     setChargeOpen(false);
     showToast(`${(amount + bonus).toLocaleString()}P 충전 완료`);
   };
@@ -186,10 +203,10 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
       return;
     }
     if (p.fast) {
-      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { setPoints(v => v - 10000); setUnlocked(u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처 확인 완료"); } });
+      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_fast_contact"); setUnlocked(u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처 확인 완료"); } });
       return;
     }
-    openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { setPoints(v => v - 10000); setRequests(r => ({ ...r, [p.id]: "pending" })); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
+    openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_safe_request"); setRequests(r => ({ ...r, [p.id]: "pending" })); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
   };
   useEffect(() => {
     setListMode(menuMode);

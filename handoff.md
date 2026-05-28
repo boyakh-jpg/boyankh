@@ -833,7 +833,7 @@ alter publication supabase_realtime add table public.chat_messages;
 
 ## 다음 세션 시작 지침
 
-- GitHub `main` 기준 최신 커밋: `0de9519`.
+- GitHub `main` 최신 상태 기준으로 시작한다.
 - 먼저 `AGENTS.md`, `handoff.md`, `src/App.jsx`를 읽고 이어서 작업한다.
 - 최근 핵심 수정 파일:
   - `src/components/Broker.jsx`
@@ -852,3 +852,71 @@ alter publication supabase_realtime add table public.chat_messages;
 - 승인/거절 상태는 `src/data/cache.js` 메모리 캐시 기준이다.
 - 새로고침하면 일부 임시 캐시는 초기화된다.
 - 다음 우선순위는 Supabase 실제 테이블/RLS/API 기준으로 프론트 임시 로직을 하나씩 제거하는 것이다.
+
+## 추가 인계: 포인트 지갑 백엔드 연결
+
+- `src/data/cache.js`에 포인트 지갑 공통 함수를 추가했다.
+- 포인트 기준 키는 테스트 아이디별 `demoUser.id`다.
+- 기본 포인트:
+  - 소유주: `12,000P`
+  - 직거래: `30,000P`
+  - 중개사: `50,000P`
+- `src/components/Broker.jsx`, `src/components/BuyerExplore.jsx`, `src/components/Settings.jsx`는 이제 같은 포인트 지갑을 본다.
+- 아이디를 바꿨다가 다시 원래 아이디로 돌아와도 `user_points` 또는 `localStorage` fallback 기준으로 포인트가 유지된다.
+- 충전/차감은 `user_points.balance`에 저장하고, 내역은 `point_ledger`에 insert한다.
+- Supabase 테이블이 없거나 RLS가 막으면 콘솔에 `Supabase user_points ... error`가 찍히고 `localStorage` fallback으로 동작한다.
+- 실제 서비스에서는 포인트 차감/환불/충전을 프론트 upsert가 아니라 서버 RPC 트랜잭션으로 처리해야 한다.
+- 개발용 Supabase SQL:
+
+```sql
+create table if not exists public.user_points (
+  user_key text primary key,
+  balance integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.point_ledger (
+  id bigint generated always as identity primary key,
+  user_key text not null,
+  delta integer not null,
+  balance_after integer not null,
+  reason text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.user_points enable row level security;
+alter table public.point_ledger enable row level security;
+
+create policy "dev can read user points"
+on public.user_points
+for select
+to anon
+using (true);
+
+create policy "dev can insert user points"
+on public.user_points
+for insert
+to anon
+with check (true);
+
+create policy "dev can update user points"
+on public.user_points
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "dev can read point ledger"
+on public.point_ledger
+for select
+to anon
+using (true);
+
+create policy "dev can insert point ledger"
+on public.point_ledger
+for insert
+to anon
+with check (true);
+```
+
+- 실제 auth 적용 시 `user_key`는 `auth.uid()`로 바꾸고, RLS도 `user_key = auth.uid()::text` 기준으로 제한해야 한다.

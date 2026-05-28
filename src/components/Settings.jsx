@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { C, G, SH1, SH2 } from "../theme";
 import { REGIONS } from "../data/data";
 import { DEMO_USERS, getDemoUser, saveDemoUser } from "../data/demoUsers";
+import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, savePointBalance } from "../data/cache";
 import { Frog, RoleToggle, SelectBox, Tag } from "./common";
 
 const NOTIFICATION_LABELS = [
@@ -70,9 +71,12 @@ function TextArea({ label, value, onChange, placeholder }) {
 }
 
 function AccountSubPage({ page, role, brokerTier, onBack }) {
+  const demoUser = getDemoUser();
+  const pointDefault = getDefaultPointBalance(demoUser.role);
   const pageTopRef = useRef(null);
   const [chargeStep, setChargeStep] = useState("summary");
   const [selectedPoint, setSelectedPoint] = useState(null);
+  const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
   const [profile, setProfile] = useState({ name: "홍길동", phone: "010-1234-5678", email: "toad@example.com", roleNote: role === "broker" ? "소유주 · 중개사 · 직거래" : "소유주 · 직거래" });
   const [supportDraft, setSupportDraft] = useState({ title: "", body: "", contact: "010-1234-5678", reportTarget: "", reportBody: "" });
   const setProfileField = (key, value) => setProfile(p => ({ ...p, [key]: value }));
@@ -82,12 +86,32 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
     pageTopRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
   }, [page, chargeStep]);
 
+  useEffect(() => {
+    let alive = true;
+    setPoints(loadLocalPointBalance(demoUser.id, pointDefault));
+    loadPointBalance({ userId: demoUser.id, defaultBalance: pointDefault }).then(balance => {
+      if (alive) setPoints(balance);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id, pointDefault]);
+
+  const updatePoints = (updater, reason) => setPoints(prev => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    savePointBalance({ userId: demoUser.id, balance: next, delta: next - prev, reason });
+    return next;
+  });
+
   const pointProducts = [
     { amount: 10000, bonus: 0 },
     { amount: 30000, bonus: role === "broker" ? 1500 : 900 },
     { amount: 50000, bonus: role === "broker" ? 5000 : 2500 },
     { amount: 100000, bonus: role === "broker" ? 10000 : 10000 },
   ];
+  const completePointPayment = product => {
+    const total = product.amount + product.bonus;
+    updatePoints(p => p + total, "settings_point_charge");
+    setChargeStep("done");
+  };
 
   if (page === "payments" && chargeStep === "checkout") {
     const product = selectedPoint || pointProducts[0];
@@ -112,7 +136,7 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
             </div>
           ))}
         </Section>
-        <button onClick={() => setChargeStep("done")} style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 16, padding: "14px 0", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: SH2 }}>외부 결제창으로 이동</button>
+        <button onClick={() => completePointPayment(product)} style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 16, padding: "14px 0", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: SH2 }}>외부 결제창으로 이동</button>
       </div>
     );
   }
@@ -146,7 +170,7 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
             <div style={{ background: G.greenSoft, borderRadius: 14, padding: "12px 10px" }}>
               <div style={{ fontSize: 11, color: C.gray, fontWeight: 800 }}>보유 포인트</div>
-              <div style={{ fontSize: 18, color: C.greenInk, fontWeight: 900, marginTop: 2 }}>{role === "broker" ? "48,000P" : "12,000P"}</div>
+              <div style={{ fontSize: 18, color: C.greenInk, fontWeight: 900, marginTop: 2 }}>{points.toLocaleString()}P</div>
             </div>
             <div style={{ background: G.goldSoft, borderRadius: 14, padding: "12px 10px" }}>
               <div style={{ fontSize: 11, color: C.gray, fontWeight: 800 }}>구독 등급</div>
