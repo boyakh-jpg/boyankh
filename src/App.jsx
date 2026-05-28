@@ -30,8 +30,10 @@ const saveSetting = (key, value) => {
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
 };
+const OWNER_KEY = "toad-demo-owner";
 const normalizeListing = row => ({
   id: row.id,
+  mine: row.mine || row.owner_key === OWNER_KEY,
   region: row.region || "지역 미입력",
   dong: row.dong || "",
   complex: row.complex || row.title || "매물명 미입력",
@@ -75,6 +77,7 @@ const normalizeListing = row => ({
 });
 const listingToInsertRow = p => ({
   title: p.complex || "새 매물",
+  owner_key: OWNER_KEY,
   price: p.priceNum || 0,
   address: `${p.region || ""} ${p.dong || ""}`.trim(),
   region: p.region,
@@ -190,11 +193,21 @@ export default function App() {
   }, []);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
   const addProperty = async p => {
-    const { data, error } = await supabase
+    const insertRow = listingToInsertRow(p);
+    let { data, error } = await supabase
       .from("listings")
-      .insert(listingToInsertRow(p))
+      .insert(insertRow)
       .select("*")
       .single();
+
+    if (error && error.message?.includes("owner_key")) {
+      const { owner_key, ...fallbackRow } = insertRow;
+      ({ data, error } = await supabase
+        .from("listings")
+        .insert(fallbackRow)
+        .select("*")
+        .single());
+    }
 
     if (error) {
       console.error("Supabase insert listing error:", error);
