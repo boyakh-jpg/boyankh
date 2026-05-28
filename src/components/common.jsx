@@ -71,6 +71,13 @@ const ROLE_LABEL = { owner: "소유주", broker: "중개사", buyer: "직거래"
 export function RoleToggle({ role, onClick, roles = ["owner", "broker", "buyer"] }) {
   const cur = ROLE_LABEL[role] || "소유주";
   const order = roles.includes(role) ? roles : ["owner", "buyer"];
+  if (order.length <= 1) {
+    return (
+      <button disabled style={{ minWidth: 82, boxSizing: "border-box", background: "#ffffff2e", border: "1px solid #ffffff55", borderRadius: 20, padding: "6px 10px", color: "#fff", fontSize: 12, fontWeight: 900, cursor: "default", fontFamily: "inherit", whiteSpace: "nowrap", transform: "translateY(3px)" }}>
+        {cur}
+      </button>
+    );
+  }
   const next = ROLE_LABEL[order[(order.indexOf(role) + 1) % order.length]] || "직거래";
   return (
     <button onClick={onClick} style={{ minWidth: 104, boxSizing: "border-box", background: "#ffffff2e", border: "1px solid #ffffff55", borderRadius: 20, padding: "6px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap", transform: "translateY(3px)" }}>
@@ -280,7 +287,7 @@ export function MiniMap({ items, activeId, onPick, tone = "green" }) {
   );
 }
 
-export function ListSheet({ kind, onlyNew = false, onClose }) {
+export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner", onClose }) {
   const isBroker = kind === "broker";
   const [showAll, setShowAll] = useState(false);
   const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
@@ -293,7 +300,31 @@ export function ListSheet({ kind, onlyNew = false, onClose }) {
       return next;
     });
   };
-  const allItems = isBroker ? INTEREST_BROKERS : DIRECT_BUYERS;
+  const ownerTwoBrokers = INTEREST_BROKERS.slice(1, 3).map((broker, index) => ({
+    ...broker,
+    name: index === 0 ? "서민재 공인중개사" : "오하린 공인중개사",
+    office: index === 0 ? "대치 센트럴공인중개사" : "강남 로열부동산",
+    region: "강남구",
+    listingTitle: "강남구 대치동 은마아파트 · 76㎡",
+    proposalNew: index === 0,
+    chatId: index === 0 ? "demo-test-chat" : null,
+  }));
+  const ownerTwoBuyers = DIRECT_BUYERS.slice(0, 1).map(buyer => ({
+    ...buyer,
+    name: "실거주 매수자 C",
+    note: "학군 실거주 목적, 잔금 일정 빠르게 협의 가능",
+    when: "35분 전",
+    budget: "18억까지",
+    proposalNew: true,
+    requestId: "direct-safe-owner-b",
+    chatId: "demo-test-chat",
+    listingTitle: "강남구 대치동 은마아파트 · 76㎡",
+  }));
+  const allItems = viewerKey === "toad-demo-owner-2"
+    ? (isBroker ? ownerTwoBrokers : ownerTwoBuyers)
+    : viewerKey === "toad-demo-owner"
+      ? (isBroker ? INTEREST_BROKERS : DIRECT_BUYERS)
+      : [];
   const items = onlyNew && !showAll ? allItems.filter(b => b.proposalNew) : allItems;
   const title = isBroker
     ? (onlyNew && !showAll ? `새롭게 제안한 부동산 ${items.length}곳` : `의뢰받은 부동산 ${items.length}곳`)

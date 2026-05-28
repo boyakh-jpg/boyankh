@@ -3,7 +3,7 @@ import { C, G, SH1, SH2 } from "../theme";
 import { isDone, isExpired, isExpiringSoon, daysLeft, termLabel, updateLabel } from "../utils/helpers";
 import { RoleToggle, FilterChips, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, ListSheet, Dot, Btn, Frog, Tag, StatCard } from "./common";
 
-export function MyList({ properties = [], preset = {}, onRegister, onSetDone, onExtendTerm, onUpdatePrice, onUpdateListing, role, availableRoles, onSwitchRole }) {
+export function MyList({ properties = [], preset = {}, viewerKey = "toad-demo-owner", onRegister, onSetDone, onExtendTerm, onUpdatePrice, onUpdateListing, role, availableRoles, onSwitchRole }) {
   const [view, setView] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [priceEdit, setPriceEdit] = useState(null);
@@ -33,6 +33,19 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
         { name: "윤서아 공인중개사", office: "잠실역 으뜸부동산", when: "2시간 전", sec: 25 },
       ] },
   ]);
+  const [ownerTwoDemoListings, setOwnerTwoDemoListings] = useState([
+    { id: "demo-owner-b-1", type: "아파트 매매", dealType: "매매", region: "강남구", dong: "대치동", addr: "강남구 대치동 은마아파트", detail: "76㎡ · 9층 · 남향", price: "17억 8,000만", priceNum: 178000, fee: "0.4%", status: "안심의뢰", tone: "green", fast: false, brokers: 2, direct: 1, days: 5, views: 18, dealState: "active", doneLabel: "매도완료", supplyArea: 101, exclusiveArea: 76, floor: 9, totalFloor: 14, roomCount: 3, bathCount: 1, moveInDate: "2026년 8월 협의", loan: "없음", duplex: "단층", updatedAgo: "1시간 전", updatedReason: "매물 정보 수정", priceHistory: [{ date: "2026-05-01", priceNum: 180000, reason: "최초 등록" }, { date: "2026-05-27", priceNum: 178000, reason: "가격 조정" }],
+      description: "학군 수요가 꾸준한 단지예요. 실거주 매수자와 일정 조율이 필요해요.", maintenance: "21만원", parking: "세대당 1대", direction: "남향", special: "욕실 수리 완료", tenant: "없어요 (공실)", tenantEnd: "", tenantDeposit: "", tenantMonthly: "", tenantMemo: "",
+      viewLog: [
+        { name: "서민재 공인중개사", office: "대치 센트럴공인중개사", when: "35분 전", sec: 132 },
+        { name: "오하린 공인중개사", office: "강남 로열부동산", when: "2시간 전", sec: 54 },
+      ] },
+    { id: "demo-owner-b-2", type: "오피스텔 월세", dealType: "월세", region: "강남구", dong: "역삼동", addr: "강남구 역삼동 강남역 센트럴", detail: "29㎡ · 12층 · 서향", price: "1,000/95만", priceNum: 1000, fee: "0.4%", status: "빠른의뢰", tone: "gold", fast: true, brokers: 0, direct: 3, days: 9, views: 32, dealState: "active", doneLabel: "임대완료", supplyArea: 42, exclusiveArea: 29, floor: 12, totalFloor: 18, roomCount: 1, bathCount: 1, moveInDate: "즉시입주", loan: "없음", duplex: "단층", updatedAgo: "방금 전", updatedReason: "최초 등록", priceHistory: [{ date: "2026-05-27", priceNum: 1000, reason: "최초 등록" }],
+      description: "역세권 단기 문의가 많아요. 직거래 문의 위주로 확인하면 돼요.", maintenance: "12만원", parking: "불가", direction: "서향", special: "풀옵션", tenant: "없어요 (공실)", tenantEnd: "", tenantDeposit: "", tenantMonthly: "", tenantMemo: "",
+      viewLog: [] },
+  ]);
+  const activeDemoListings = viewerKey === "toad-demo-owner-2" ? ownerTwoDemoListings : viewerKey === "toad-demo-owner" ? demoListings : [];
+  const setActiveDemoListings = viewerKey === "toad-demo-owner-2" ? setOwnerTwoDemoListings : setDemoListings;
   // 공용 store에서 내가 등록한 매물 → MyList 표시 형식으로 정규화
   const mine = properties.filter(p => p.mine).map(p => ({
     id: p.id, type: `${p.propType} ${p.dealType}`, dealType: p.dealType,
@@ -48,7 +61,7 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
     viewLog: [],
   }));
   // 새 등록분이 위로, 그 다음 데모
-  const listings = [...mine, ...demoListings];
+  const listings = [...mine, ...activeDemoListings];
   const visibleListings = listings.filter(l => {
     if (statusFilter === "만료 임박") return l.dealState !== "done" && (l.days ?? 14) <= 3;
     if (statusFilter === "거래중") return l.dealState !== "done";
@@ -58,13 +71,13 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
   // 거래 완료/되돌리기: store 매물은 전역 반영(onSetDone), 데모는 자체 state
   const setDone = (l, done) => {
     if (l.fromStore) { onSetDone && onSetDone(l.id, done); }
-    else { setDemoListings(ls => ls.map(x => x.id === l.id ? { ...x, dealState: done ? "done" : "active" } : x)); }
+    else { setActiveDemoListings(ls => ls.map(x => x.id === l.id ? { ...x, dealState: done ? "done" : "active" } : x)); }
     showToast(done ? "거래 완료로 변경됐어요 · 중개사·매수자 화면에 완료 표시" : "다시 거래중으로 변경됐어요");
   };
   // 의뢰 기한 2주 연장
   const extendTerm = l => {
     if (l.fromStore) { onExtendTerm && onExtendTerm(l.id); }
-    else { setDemoListings(ls => ls.map(x => x.id === l.id ? { ...x, days: (x.days || 0) + 14 } : x)); }
+    else { setActiveDemoListings(ls => ls.map(x => x.id === l.id ? { ...x, days: (x.days || 0) + 14 } : x)); }
     showToast("의뢰 기한이 2주 연장됐어요");
   };
   const formatMan = man => {
@@ -181,7 +194,7 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
     if (infoEdit.fromStore) {
       onUpdateListing && onUpdateListing(infoEdit.id, patch);
     } else {
-      setDemoListings(ls => ls.map(x => x.id === infoEdit.id ? { ...x, ...patch, detail, updatedAgo: "방금 전", updatedReason: "매물 정보 수정" } : x));
+      setActiveDemoListings(ls => ls.map(x => x.id === infoEdit.id ? { ...x, ...patch, detail, updatedAgo: "방금 전", updatedReason: "매물 정보 수정" } : x));
     }
     setInfoEdit(null);
     showToast("매물 정보가 수정됐어요");
@@ -199,7 +212,7 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
     if (priceEdit.fromStore) {
       onUpdatePrice && onUpdatePrice(priceEdit.id, priceNum, price, priceReason);
     } else {
-      setDemoListings(ls => ls.map(x => x.id === priceEdit.id ? { ...x, priceNum, price, updatedAgo: "방금 전", updatedReason: priceReason, priceHistory: [...(x.priceHistory || []), historyItem] } : x));
+      setActiveDemoListings(ls => ls.map(x => x.id === priceEdit.id ? { ...x, priceNum, price, updatedAgo: "방금 전", updatedReason: priceReason, priceHistory: [...(x.priceHistory || []), historyItem] } : x));
     }
     setPriceEdit(null);
     showToast("가격이 변경됐어요 · 가격 추이에 기록됨");
@@ -211,7 +224,7 @@ export function MyList({ properties = [], preset = {}, onRegister, onSetDone, on
     return (
       <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
         {toast && <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", background: "#3A4A42ee", color: "#fff", padding: "10px 18px", borderRadius: 20, fontSize: 13, zIndex: 60, animation: "fadeIn .2s", boxShadow: SH1, textAlign: "center", maxWidth: "88%" }}>{toast}</div>}
-        {sheet && <ListSheet kind={sheet} onClose={() => setSheet(null)}/>}
+        {sheet && <ListSheet kind={sheet} viewerKey={viewerKey} onClose={() => setSheet(null)}/>}
         {priceEdit && (
           <div onClick={() => setPriceEdit(null)} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
             <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: G.pageBg, borderRadius: "26px 26px 0 0", padding: "20px 18px 28px", boxSizing: "border-box", animation: "sheetUp .3s" }}>

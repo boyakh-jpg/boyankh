@@ -709,6 +709,24 @@
 - 현재 로그인/auth 전이므로 개발용 `anon update` 정책으로 테스트한다.
 - 실제 서비스에서는 `owner_id = auth.uid()` 기준으로 update 권한을 제한해야 한다.
 
+## 추가 인계: 테스트 아이디/채팅 데모 분리
+
+- `src/data/demoUsers.js`의 테스트 아이디 선택값은 `localStorage`의 `toad.demoOwnerKey` 기준이다.
+- 설정에서 테스트 아이디를 바꾸면 프론트 역할도 해당 아이디의 `role`로 강제 변경한다.
+  - 소유주 아이디: 소유주 메뉴만 노출
+  - 중개사 아이디: 중개사 메뉴만 노출
+  - 직거래 아이디: 직거래 메뉴만 노출
+- 현재 역할 제한은 프론트 데모 로직이다. 백엔드에서는 로그인 사용자 권한/역할 테이블 기준으로 대체해야 한다.
+- `src/components/MyList.jsx`의 소유주 A/B 데모 매물은 프론트 임시 데이터다.
+  - 소유주 A: 기존 공덕/잠실 매물
+  - 소유주 B: 대치/역삼 매물
+- `src/components/common.jsx`의 `ListSheet`는 `viewerKey`로 소유주 A/B의 제안 부동산/직거래 매수자 목록을 다르게 보여준다.
+- `src/components/Chat.jsx`에 `demo-test-chat` 테스트 채팅방을 추가했다.
+  - 모든 테스트 아이디가 같은 `thread_id = demo-test-chat`을 사용한다.
+  - 메시지는 Supabase `chat_messages`에 저장된다.
+  - 실제 서비스에서는 `chats`, `chat_participants`, `chat_messages`를 사용자 권한 기준으로 조회해야 한다.
+- 새로고침하면 `src/data/cache.js` 메모리 캐시는 초기화된다.
+
 ## 추가 인계: listings 임시 소유자 키
 
 - GitHub `main`의 `src/App.jsx`에 임시 소유자 키를 추가했다.

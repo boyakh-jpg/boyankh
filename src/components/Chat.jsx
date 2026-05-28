@@ -6,6 +6,19 @@ import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
 import { RoleToggle, Frog, Tag } from "./common";
 
+const DEMO_TEST_CHAT = {
+  id: "demo-test-chat",
+  name: "테스트 채팅방",
+  office: "테스트 아이디 전체",
+  property: "테스트 아이디 메시지 확인",
+  unread: 0,
+  mode: "테스트",
+  demo: true,
+  messages: [
+    { from: "broker", senderKey: "toad-demo-system", senderName: "테스트 안내", text: "테스트 아이디를 바꿔가며 같은 채팅방에서 메시지가 어떻게 보이는지 확인하세요.", time: "방금 전" },
+  ],
+};
+
 const chatTime = value => {
   try {
     return new Date(value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
@@ -29,9 +42,14 @@ const messageFromRow = row => ({
   createdAt: row.created_at,
 });
 
+const chatsForRole = role => [
+  DEMO_TEST_CHAT,
+  ...CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true),
+];
+
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   const demoUser = getDemoUser();
-  const visibleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true);
+  const visibleChats = chatsForRole(role);
   const [latestByThread, setLatestByThread] = useState({});
 
   useEffect(() => {
@@ -102,7 +120,7 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
 }
 
 export function ChatRoom({ chatId, role, onBack }) {
-  const chat = CHATS.find(c => c.id === chatId) || CHATS[0];
+  const chat = chatsForRole(role).find(c => c.id === chatId) || DEMO_TEST_CHAT;
   const demoUser = getDemoUser();
   const decisionKey = chat.contactRequestId || chat.id;
   const [msgs, setMsgs] = useState(() => baseMessages(chat));
@@ -168,7 +186,7 @@ export function ChatRoom({ chatId, role, onBack }) {
   };
   const isDirect = chat.mode === "직거래";
   const isFast = chat.mode === "빠른의뢰";
-  const needsContactApproval = !isFast;
+  const needsContactApproval = !chat.demo && !isFast;
   const canApproveContact = role === "owner";
   const contactDecision = localContactDecision;
   const decideContact = approved => {

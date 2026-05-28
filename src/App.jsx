@@ -14,6 +14,7 @@ import { Settings } from "./components/Settings";
 import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
+import { getDemoUser } from "./data/demoUsers";
 
 const loadSetting = (key, fallback) => {
   try {
@@ -31,9 +32,9 @@ const saveSetting = (key, value) => {
   } catch {}
 };
 const OWNER_KEY = "toad-demo-owner";
-const normalizeListing = row => ({
+const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
-  mine: row.mine || row.owner_key === OWNER_KEY,
+  mine: row.mine || row.owner_key === ownerKey,
   region: row.region || "지역 미입력",
   dong: row.dong || "",
   complex: row.complex || row.title || "매물명 미입력",
@@ -75,9 +76,9 @@ const normalizeListing = row => ({
   tenantMonthly: row.tenantMonthly || row.tenant_monthly,
   tenantMemo: row.tenantMemo || row.tenant_memo,
 });
-const listingToInsertRow = p => ({
+const listingToInsertRow = (p, ownerKey = OWNER_KEY) => ({
   title: p.complex || "새 매물",
-  owner_key: OWNER_KEY,
+  owner_key: ownerKey,
   price: p.priceNum || 0,
   address: `${p.region || ""} ${p.dong || ""}`.trim(),
   region: p.region,
@@ -154,6 +155,7 @@ export default function App() {
   const [screen, setScreen] = useState("splash");
   const [accountType, setAccountType] = useState("user");
   const [role, setRole] = useState(null);
+  const [demoUser, setDemoUser] = useState(() => getDemoUser());
   const [activeChat, setActiveChat] = useState(null);
   const [modal, setModal] = useState(null); // { type, payload, onConfirm }
   const [brokerTier, setBrokerTier] = useState("골드");
@@ -185,15 +187,15 @@ export default function App() {
       }
 
       if (Array.isArray(data) && data.length > 0) {
-        setProperties(data.map(normalizeListing));
+        setProperties(data.map(row => normalizeListing(row, demoUser.id)));
       }
     }
 
     loadListings();
-  }, []);
+  }, [demoUser.id]);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
   const addProperty = async p => {
-    const insertRow = listingToInsertRow(p);
+    const insertRow = listingToInsertRow(p, demoUser.id);
     let { data, error } = await supabase
       .from("listings")
       .insert(insertRow)
@@ -215,7 +217,7 @@ export default function App() {
       return;
     }
 
-    setProperties(prev => [{ ...normalizeListing(data), mine: true }, ...prev]);
+    setProperties(prev => [{ ...normalizeListing(data, demoUser.id), mine: true }, ...prev]);
   };
   // 거래 완료/되돌리기 토글
   const setDealDone = async (id, done) => {
@@ -277,14 +279,21 @@ export default function App() {
     setProperties(prev => prev.map(p => p.id === id ? { ...p, ...nextPatch } : p));
   };
   const closeModal = () => setModal(null);
-  const availableRoles = accountType === "broker" ? ["owner", "broker", "buyer"] : ["owner", "buyer"];
+  const availableRoles = [demoUser.role];
   const switchRole = () => {
+    if (availableRoles.length < 2) return;
     const nr = availableRoles[(availableRoles.indexOf(role) + 1) % availableRoles.length];
     setRole(nr);
     setModal(null);
     setScreen("home");
   };
   const openChat = id => { setActiveChat(id); setScreen("chatroom"); };
+  const applyDemoUser = user => {
+    setDemoUser(user);
+    setRole(user.role);
+    setAccountType(user.role === "broker" ? "broker" : "user");
+    setModal(null);
+  };
   const openBrokerList = (preset = {}) => { setBrokerPreset({ region: preferredRegion, ...preset }); setScreen("broker"); };
   const openBuyerList = (preset = {}) => { setBuyerPreset({ region: preferredRegion, ...preset }); setScreen("buyer"); };
   const openMyList = (preset = {}) => { setMyListPreset(preset); setScreen("mylist"); };
@@ -335,11 +344,11 @@ export default function App() {
           {screen === "home" && <Home properties={properties} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "offices" && <BrokerOffices role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
-          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
+          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={listing => openChat(listing?.fast ? "c4" : "c1")} openModal={setModal}/>}
           {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={() => openChat("c3")}/>}
           {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={() => openChat("c3")}/>}
-          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} onSubscription={() => setScreen("profile")} onBack={() => setScreen(settingsBack)}/>}
+          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "chatroom" && <ChatRoom chatId={activeChat} role={role} onBack={() => setScreen("chatlist")}/>}
           {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}

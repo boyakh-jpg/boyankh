@@ -249,7 +249,7 @@ function BrokerSubPage({ page, brokerTier, onSubscription, onBack }) {
   );
 }
 
-export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", onSubscription, onBack }) {
+export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", onSubscription, onDemoUserChange, onOpenDemoChat, onBack }) {
   const [accountPage, setAccountPage] = useState(null);
   const [brokerPage, setBrokerPage] = useState(null);
   const [demoUserId, setDemoUserId] = useState(() => getDemoUser().id);
@@ -259,6 +259,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
   const selectDemoUser = user => {
     saveDemoUser(user.id);
     setDemoUserId(user.id);
+    onDemoUserChange && onDemoUserChange(user);
   };
 
   useEffect(() => {
@@ -280,6 +281,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
         </div>
       </div>
       {accountPage ? <AccountSubPage page={accountPage} role={role} brokerTier={brokerTier} onBack={() => setAccountPage(null)}/> : brokerPage ? <BrokerSubPage page={brokerPage} brokerTier={brokerTier} onSubscription={onSubscription} onBack={() => setBrokerPage(null)}/> : <div style={{ padding: 16 }}>
+        <BackButton label="뒤로가기" onClick={onBack}/>
         <Section title="테스트 아이디">
           <div style={{ background: G.greenSoft, borderRadius: 14, padding: "12px 13px", marginBottom: 10 }}>
             <div style={{ fontSize: 13, color: C.greenInk, fontWeight: 900 }}>{selectedDemoUser.label}</div>
@@ -296,6 +298,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
               );
             })}
           </div>
+          <button onClick={onOpenDemoChat} style={{ width: "100%", marginTop: 10, border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>테스트 채팅방 열기</button>
         </Section>
         <Section title="내 지역">
           <SelectBox label="기본 지역" value={preferredRegion} options={regionOptions} onChange={onRegionChange}/>
@@ -323,7 +326,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
           <MenuRow title="포인트/결제" sub="충전 내역, 사용 내역, 결제수단" onClick={() => setAccountPage("payments")}/>
           <MenuRow title="고객지원" sub="문의하기, 신고하기, 약관" onClick={() => setAccountPage("support")}/>
         </Section>
-        <BackButton label="뒤로가기" onClick={onBack}/>
+        <button onClick={onBack} style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 16, padding: "14px 0", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: SH2 }}>설정 저장</button>
       </div>}
     </div>
   );
