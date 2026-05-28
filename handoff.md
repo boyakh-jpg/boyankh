@@ -830,3 +830,25 @@ alter publication supabase_realtime add table public.chat_messages;
 - `src/components/Chat.jsx`는 만료 매물 채팅 컨텍스트에서 연락처 요청 박스와 메시지 입력을 막는다.
 - 실제 백엔드에서는 만료 매물에 대해 `owner_phone` 조회 API/RPC가 403/410을 반환해야 한다.
 - 포인트 차감은 연락처 조회 가능 여부를 서버에서 확인한 뒤에만 확정해야 한다.
+
+## 다음 세션 시작 지침
+
+- GitHub `main` 기준 최신 커밋: `0de9519`.
+- 먼저 `AGENTS.md`, `handoff.md`, `src/App.jsx`를 읽고 이어서 작업한다.
+- 최근 핵심 수정 파일:
+  - `src/components/Broker.jsx`
+  - `src/components/BuyerExplore.jsx`
+  - `src/components/Chat.jsx`
+  - `src/components/Onboarding.jsx`
+  - `src/components/Settings.jsx`
+  - `src/components/common.jsx`
+  - `src/data/cache.js`
+  - `src/utils/helpers.js`
+- 로컬 원본 폴더는 직접 수정하지 말고 GitHub `main`에 커밋/푸시한다.
+- 사용자는 StackBlitz로 바로 확인한다. 반영이 늦으면 StackBlitz `Restart` 또는 새로고침이 필요하다.
+- 로컬 빌드 검증은 하지 않는다. 이 환경은 `package.json`이 없거나 npm 검증이 불안정하다.
+- 가능한 검증은 `git diff --check`와 정적 검색 기준으로 한다.
+- 프론트 임시 백엔드 로직을 추가하면 바로 이 `handoff.md`에 기록한다.
+- 승인/거절 상태는 `src/data/cache.js` 메모리 캐시 기준이다.
+- 새로고침하면 일부 임시 캐시는 초기화된다.
+- 다음 우선순위는 Supabase 실제 테이블/RLS/API 기준으로 프론트 임시 로직을 하나씩 제거하는 것이다.
