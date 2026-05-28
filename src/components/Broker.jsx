@@ -3,6 +3,7 @@ import { C, G, SH1, SH2, spring } from "../theme";
 import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/data";
 import { applyStatusFilter, STATUS_FILTERS, isDone, isExpiringSoon, daysLeft, termLabel, termLeft, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
+import { getDemoUser } from "../data/demoUsers";
 
 function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
@@ -33,12 +34,27 @@ function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
 }
 
 const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.includes(v));
+const loadStoredMap = (key, fallback = {}) => {
+  try {
+    const saved = window.localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const saveStoredMap = (key, value) => {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+};
 
 export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all", role, availableRoles, tier = "골드", onSwitchRole, onOpenChat, openModal }) {
+  const demoUser = getDemoUser();
+  const cacheKey = name => `toad.${demoUser.id}.${name}`;
   const [points, setPoints] = useState(50000);
-  const [contacted, setContacted] = useState({});
-  const [safeRequests, setSafeRequests] = useState({});
-  const [favorites, setFavorites] = useState({});
+  const [contacted, setContacted] = useState(() => loadStoredMap(cacheKey("brokerContacted")));
+  const [safeRequests, setSafeRequests] = useState(() => loadStoredMap(cacheKey("brokerSafeRequests")));
+  const [favorites, setFavorites] = useState(() => loadStoredMap(cacheKey("brokerFavorites")));
   const [defaultMsg, setDefaultMsg] = useState("안녕하세요! 해당 매물 빠른 거래 도와드리겠습니다.");
   const [toast, setToast] = useState("");
   const [chargeOpen, setChargeOpen] = useState(false);
@@ -51,7 +67,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const [dealTypes, setDealTypes] = useState(Array.isArray(preset.dealTypes) ? preset.dealTypes : (preset.dealType && preset.dealType !== "전체" ? [preset.dealType] : []));
   const [sort, setSort] = useState(preset.sort || "최신순");
   const [statusFilter, setStatusFilter] = useState(preset.statusFilter || "거래중만 보기"); // 기본: 거래중인 매물만
-  const [viewed, setViewed] = useState({});      // 내가 열람한 매물 기록 {id: timestamp}
+  const [viewed, setViewed] = useState(() => loadStoredMap(cacheKey("brokerViewed")));      // 내가 열람한 매물 기록 {id: timestamp}
   const [notes, setNotes] = useState({});        // 매물별 메모 {id: text}
   const [activeId, setActiveId] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -62,8 +78,15 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const tierBonusRate = { 무료: 0, 실버: 0.05, 골드: 0.1 }[tier] || 0;
   const tierCost = { 무료: { fast: 2000, safe: 1000 }, 실버: { fast: 1900, safe: 950 }, 골드: { fast: 1800, safe: 900 } }[tier] || { fast: 2000, safe: 1000 };
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2000); };
-  const markViewed = id => setViewed(v => v[id] ? v : ({ ...v, [id]: "방금" }));
-  const toggleFavorite = id => setFavorites(v => ({ ...v, [id]: !v[id] }));
+  const updateStoredMap = (name, setter, updater) => setter(prev => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    saveStoredMap(cacheKey(name), next);
+    return next;
+  });
+  const markViewed = id => updateStoredMap("brokerViewed", setViewed, v => v[id] ? v : ({ ...v, [id]: "방금" }));
+  const markContacted = id => updateStoredMap("brokerContacted", setContacted, c => ({ ...c, [id]: true }));
+  const markSafeRequest = (id, status) => updateStoredMap("brokerSafeRequests", setSafeRequests, r => ({ ...r, [id]: status }));
+  const toggleFavorite = id => updateStoredMap("brokerFavorites", setFavorites, v => ({ ...v, [id]: !v[id] }));
   const matchesPresetRegion = p => region === "전체" ? true : p.region === region;
   const matchesAppliedRegion = p => appliedFilters.region === "전체" ? true : p.region === appliedFilters.region;
   const dongOptions = ["전체", ...Array.from(new Set(properties.filter(p => matchesPresetRegion(p)).map(p => p.dong))).sort()];
@@ -93,13 +116,13 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const handleFast = l => {
     if (needPoints(tierCost.fast)) return;
     setPoints(p => p - tierCost.fast);
-    setContacted(c => ({ ...c, [l.id]: true }));
+    markContacted(l.id);
     markViewed(l.id);
     showToast(`번호 공개됨 · ${tierCost.fast.toLocaleString()}P 차감`);
   };
   const openApply = l => {
     if (needPoints(tierCost.safe)) return;
-    openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { setPoints(p => p - tierCost.safe); setContacted(c => ({ ...c, [l.id]: true })); setSafeRequests(r => ({ ...r, [l.id]: "pending" })); markViewed(l.id); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
+    openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { setPoints(p => p - tierCost.safe); markContacted(l.id); markSafeRequest(l.id, "pending"); markViewed(l.id); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
   };
   const openEdit = () => openModal({ type: "editMsg", payload: defaultMsg, onConfirm: m => { setDefaultMsg(m); showToast("기본 메시지 저장됨"); } });
   useEffect(() => {

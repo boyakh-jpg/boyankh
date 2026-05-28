@@ -157,6 +157,7 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [demoUser, setDemoUser] = useState(() => getDemoUser());
   const [activeChat, setActiveChat] = useState(null);
+  const [activeChatContext, setActiveChatContext] = useState(null);
   const [modal, setModal] = useState(null); // { type, payload, onConfirm }
   const [brokerTier, setBrokerTier] = useState("골드");
   const [preferredRegion, setPreferredRegion] = useState(() => loadSetting("toad.preferredRegion", "강남구"));
@@ -287,7 +288,16 @@ export default function App() {
     setModal(null);
     setScreen("home");
   };
-  const openChat = id => { setActiveChat(id); setScreen("chatroom"); };
+  const openChat = target => {
+    if (target && typeof target === "object") {
+      setActiveChat(target.id);
+      setActiveChatContext(target);
+    } else {
+      setActiveChat(target);
+      setActiveChatContext(null);
+    }
+    setScreen("chatroom");
+  };
   const applyDemoUser = user => {
     setDemoUser(user);
     setRole(user.role);
@@ -345,12 +355,12 @@ export default function App() {
           {screen === "offices" && <BrokerOffices role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
           {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={listing => openChat(listing?.fast ? "c4" : "c1")} openModal={setModal}/>}
+          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={listing => openChat({ id: `listing-${listing.id}`, listing, mode: listing.fast ? "빠른의뢰" : "안심의뢰" })} openModal={setModal}/>}
           {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={() => openChat("c3")}/>}
           {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={() => openChat("c3")}/>}
           {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {screen === "chatroom" && <ChatRoom chatId={activeChat} role={role} onBack={() => setScreen("chatlist")}/>}
+          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>}
           {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}
           {screen === "profile" && role !== "broker" && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: G.pageBg }}>

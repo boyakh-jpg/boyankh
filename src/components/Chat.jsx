@@ -19,6 +19,23 @@ const DEMO_TEST_CHAT = {
   ],
 };
 
+const chatFromContext = context => {
+  if (!context?.listing) return null;
+  const listing = context.listing;
+  const property = `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim();
+  return {
+    id: context.id,
+    name: "매물 소유주",
+    office: listing.ownerPhone ? `연락처 ${listing.ownerPhone}` : "연락처 확인됨",
+    property: property || "등록 매물",
+    unread: 0,
+    mode: context.mode || (listing.fast ? "빠른의뢰" : "안심의뢰"),
+    messages: [
+      { from: "broker", senderKey: "toad-demo-system", senderName: "채팅 안내", text: "연락처 확인 후 생성된 매물별 채팅방이에요.", time: "방금 전" },
+    ],
+  };
+};
+
 const chatPartnerProfile = (chat, role, demoUser) => {
   if (chat.demo) {
     return {
@@ -195,8 +212,9 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   );
 }
 
-export function ChatRoom({ chatId, role, onBack }) {
-  const chat = chatsForRole(role).find(c => c.id === chatId) || DEMO_TEST_CHAT;
+export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
+  const contextChat = chatContext?.id === chatId ? chatFromContext(chatContext) : null;
+  const chat = chatsForRole(role).find(c => c.id === chatId) || contextChat || DEMO_TEST_CHAT;
   const demoUser = getDemoUser();
   const decisionKey = chat.contactRequestId || chat.id;
   const [msgs, setMsgs] = useState(() => baseMessages(chat));

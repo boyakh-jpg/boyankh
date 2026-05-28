@@ -778,3 +778,16 @@ alter publication supabase_realtime add table public.chat_messages;
 - 테스트 채팅방은 단체방 기준이다.
 - 채팅방 헤더 큰제목은 채팅방명으로 고정하고, 작은제목은 참여자/방 설명을 2줄로 표시한다.
 - 말풍선 위에는 `sender_name`을 표시해서 누가 말했는지 구분한다.
+
+## 추가 인계: 중개사 열람/매물별 채팅 임시 저장
+
+- `src/components/Broker.jsx`는 중개사 테스트 계정 기준으로 아래 값을 `localStorage`에 임시 저장한다.
+  - `toad.{demoUserId}.brokerViewed`
+  - `toad.{demoUserId}.brokerContacted`
+  - `toad.{demoUserId}.brokerSafeRequests`
+  - `toad.{demoUserId}.brokerFavorites`
+- 그래서 중개사 열람목록과 번호 확인 상태는 새로고침 후에도 유지된다.
+- 실제 서비스에서는 `property_views`, `contact_unlocks`, `broker_applications` 테이블로 교체해야 한다.
+- 중개사가 매물에서 채팅을 누르면 기존 고정 `c4`가 아니라 `listing-{listing.id}` thread_id로 매물별 채팅방을 연다.
+- `src/components/Chat.jsx`는 `chatContext.listing`이 있으면 매물별 채팅방 메타데이터를 프론트에서 임시 생성한다.
+- 실제 서비스에서는 `chats`, `chat_participants`, `chat_messages` 생성 API가 먼저 실행된 뒤 서버의 chat id를 받아 열어야 한다.
