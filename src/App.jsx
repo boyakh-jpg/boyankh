@@ -13,7 +13,7 @@ import { MyList } from "./components/MyList";
 import { Settings } from "./components/Settings";
 import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
-
+import { supabase } from "./supabaseClient";
 
 const loadSetting = (key, fallback) => {
   try {
@@ -29,6 +29,123 @@ const saveSetting = (key, value) => {
   try {
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+};
+const normalizeListing = row => ({
+  id: row.id,
+  region: row.region || "지역 미입력",
+  dong: row.dong || "",
+  complex: row.complex || row.title || "매물명 미입력",
+  propType: row.propType || row.prop_type || "아파트",
+  dealType: row.dealType || row.deal_type || "매매",
+  price: row.price_label || row.priceText || row.price_text || (typeof row.price === "number" ? `${row.price.toLocaleString()}만` : row.price) || "가격 미입력",
+  priceNum: row.priceNum || row.price_num || (typeof row.price === "number" ? row.price : 0),
+  premium: row.premium ?? null,
+  area: row.area || row.exclusive_area || 0,
+  floor: row.floor || 1,
+  fee: row.fee || "0.4%",
+  fast: !!row.fast,
+  views: row.views || 0,
+  ago: row.ago || "방금 전",
+  x: row.x || 50,
+  y: row.y || 50,
+  badge: row.badge || null,
+  status: row.status || "active",
+  doneLabel: row.doneLabel || row.done_label || "거래완료",
+  completedDaysAgo: row.completedDaysAgo ?? row.completed_days_ago ?? null,
+  expiresInDays: row.expiresInDays ?? row.expires_in_days ?? 14,
+  createdDaysAgo: row.createdDaysAgo ?? row.created_days_ago ?? 0,
+  priceHistory: row.priceHistory || row.price_history || [],
+  supplyArea: row.supplyArea || row.supply_area,
+  exclusiveArea: row.exclusiveArea || row.exclusive_area,
+  totalFloor: row.totalFloor || row.total_floor,
+  roomCount: row.roomCount || row.room_count,
+  bathCount: row.bathCount || row.bath_count,
+  moveInDate: row.moveInDate || row.move_in_date,
+  loan: row.loan,
+  description: row.description,
+  maintenance: row.maintenance,
+  parking: row.parking,
+  direction: row.direction,
+  special: row.special,
+  tenant: row.tenant,
+  tenantEnd: row.tenantEnd || row.tenant_end,
+  tenantDeposit: row.tenantDeposit || row.tenant_deposit,
+  tenantMonthly: row.tenantMonthly || row.tenant_monthly,
+  tenantMemo: row.tenantMemo || row.tenant_memo,
+});
+const listingToInsertRow = p => ({
+  title: p.complex || "새 매물",
+  price: p.priceNum || 0,
+  address: `${p.region || ""} ${p.dong || ""}`.trim(),
+  region: p.region,
+  dong: p.dong,
+  complex: p.complex,
+  prop_type: p.propType,
+  deal_type: p.dealType,
+  price_label: p.price,
+  price_num: p.priceNum,
+  premium: p.premium,
+  area: p.area,
+  floor: p.floor,
+  fee: p.fee,
+  fast: p.fast,
+  views: p.views,
+  status: p.status,
+  done_label: p.doneLabel,
+  completed_days_ago: p.completedDaysAgo,
+  expires_in_days: p.expiresInDays,
+  created_days_ago: p.createdDaysAgo,
+  price_history: p.priceHistory || [],
+  supply_area: p.supplyArea,
+  exclusive_area: p.exclusiveArea,
+  total_floor: p.totalFloor,
+  room_count: p.roomCount,
+  bath_count: p.bathCount,
+  move_in_date: p.moveInDate,
+  loan: p.loan,
+  description: p.description,
+  maintenance: p.maintenance,
+  parking: p.parking,
+  direction: p.direction,
+  special: p.special,
+  tenant: p.tenant,
+  tenant_end: p.tenantEnd,
+  tenant_deposit: p.tenantDeposit,
+  tenant_monthly: p.tenantMonthly,
+  tenant_memo: p.tenantMemo,
+});
+const listingPatchToRow = patch => {
+  const row = {};
+  const map = {
+    propType: "prop_type",
+    dealType: "deal_type",
+    price: "price_label",
+    priceNum: "price_num",
+    doneLabel: "done_label",
+    completedDaysAgo: "completed_days_ago",
+    expiresInDays: "expires_in_days",
+    createdDaysAgo: "created_days_ago",
+    priceHistory: "price_history",
+    supplyArea: "supply_area",
+    exclusiveArea: "exclusive_area",
+    totalFloor: "total_floor",
+    roomCount: "room_count",
+    bathCount: "bath_count",
+    moveInDate: "move_in_date",
+    updatedAgo: "updated_ago",
+    updatedReason: "updated_reason",
+    tenantEnd: "tenant_end",
+    tenantDeposit: "tenant_deposit",
+    tenantMonthly: "tenant_monthly",
+    tenantMemo: "tenant_memo",
+  };
+  Object.entries(patch).forEach(([key, value]) => {
+    row[map[key] || key] = value;
+  });
+  if (patch.priceNum != null) row.price = patch.priceNum;
+  if (patch.complex) row.title = patch.complex;
+  if (patch.region || patch.dong) row.address = `${patch.region || ""} ${patch.dong || ""}`.trim();
+  return row;
 };
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -53,26 +170,99 @@ export default function App() {
   }, [screen]);
   // ===== 공용 매물 store (owner/broker/buyer가 같은 데이터를 봄) =====
   const [properties, setProperties] = useState(PROPERTIES);
+  useEffect(() => {
+    async function loadListings() {
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*");
+
+      if (error) {
+        console.error("Supabase listings error:", error);
+        return;
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        setProperties(data.map(normalizeListing));
+      }
+    }
+
+    loadListings();
+  }, []);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
-  const addProperty = p => setProperties(prev => [{ ...p, mine: true }, ...prev]);
+  const addProperty = async p => {
+    const { data, error } = await supabase
+      .from("listings")
+      .insert(listingToInsertRow(p))
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("Supabase insert listing error:", error);
+      setProperties(prev => [{ ...p, mine: true }, ...prev]);
+      return;
+    }
+
+    setProperties(prev => [{ ...normalizeListing(data), mine: true }, ...prev]);
+  };
   // 거래 완료/되돌리기 토글
-  const setDealDone = (id, done) => setProperties(prev => prev.map(p => p.id === id ? { ...p, status: done ? "done" : "active", completedDaysAgo: done ? 0 : null } : p));
+  const setDealDone = async (id, done) => {
+    const patch = { status: done ? "done" : "active", completedDaysAgo: done ? 0 : null };
+    const { error } = await supabase
+      .from("listings")
+      .update(listingPatchToRow(patch))
+      .eq("id", id);
+
+    if (error) console.error("Supabase update listing status error:", error);
+    setProperties(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  };
   // 의뢰 기한 2주 연장
-  const extendTerm = id => setProperties(prev => prev.map(p => p.id === id ? { ...p, expiresInDays: (p.expiresInDays ?? 14) + 14 } : p));
-  const updatePrice = (id, priceNum, price, reason) => setProperties(prev => prev.map(p => p.id === id ? {
-    ...p,
-    priceNum,
-    price,
-    updatedAgo: "방금 전",
-    updatedReason: reason,
-    priceHistory: [...(p.priceHistory || [{ date: "2026-05-01", priceNum: p.priceNum, reason: "최초 등록" }]), { date: "2026-05-27", priceNum, reason }],
-  } : p));
-  const updateListingInfo = (id, patch) => setProperties(prev => prev.map(p => p.id === id ? {
-    ...p,
-    ...patch,
-    updatedAgo: "방금 전",
-    updatedReason: "매물 정보 수정",
-  } : p));
+  const extendTerm = async id => {
+    const current = properties.find(p => p.id === id);
+    const nextDays = (current?.expiresInDays ?? 14) + 14;
+    const patch = { expiresInDays: nextDays };
+    const { error } = await supabase
+      .from("listings")
+      .update(listingPatchToRow(patch))
+      .eq("id", id);
+
+    if (error) console.error("Supabase extend listing term error:", error);
+    setProperties(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  };
+  const updatePrice = async (id, priceNum, price, reason) => {
+    const current = properties.find(p => p.id === id);
+    const priceHistory = [
+      ...(current?.priceHistory?.length ? current.priceHistory : [{ date: "2026-05-01", priceNum: current?.priceNum || priceNum, reason: "최초 등록" }]),
+      { date: new Date().toISOString().slice(0, 10), priceNum, reason },
+    ];
+    const patch = {
+      priceNum,
+      price,
+      updatedAgo: "방금 전",
+      updatedReason: reason,
+      priceHistory,
+    };
+    const { error } = await supabase
+      .from("listings")
+      .update(listingPatchToRow(patch))
+      .eq("id", id);
+
+    if (error) console.error("Supabase update listing price error:", error);
+    setProperties(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  };
+  const updateListingInfo = async (id, patch) => {
+    const nextPatch = {
+      ...patch,
+      updatedAgo: "방금 전",
+      updatedReason: "매물 정보 수정",
+    };
+    const { error } = await supabase
+      .from("listings")
+      .update(listingPatchToRow(nextPatch))
+      .eq("id", id);
+
+    if (error) console.error("Supabase update listing info error:", error);
+    setProperties(prev => prev.map(p => p.id === id ? { ...p, ...nextPatch } : p));
+  };
   const closeModal = () => setModal(null);
   const availableRoles = accountType === "broker" ? ["owner", "broker", "buyer"] : ["owner", "buyer"];
   const switchRole = () => {
