@@ -811,3 +811,11 @@ alter publication supabase_realtime add table public.chat_messages;
 - `어떻게 이용하시나요?` 화면은 `src/App.jsx`의 `availableRoles`를 받아 표시 역할을 제한한다.
 - 중개사 권한 계정은 `소유주`, `중개사`만 보고 `구하고 있어요`는 보지 않는다.
 - 실제 서비스에서는 로그인 사용자 권한 테이블에서 `availableRoles`를 내려줘야 한다.
+
+## 추가 인계: 연락처 보안 기준
+
+- 채팅 메시지 본문에는 소유주 연락처 원문을 저장하거나 표시하지 않는다.
+- `src/components/Chat.jsx`의 연락처 승인 안내는 승인/거절 상태만 표시한다.
+- 실제 서비스에서는 `listings` 공개 조회 응답에 `owner_phone`을 포함하지 않아야 한다.
+- 연락처 공개는 `contact_requests` 승인 상태, 포인트 차감 확정, 참여자 권한 검증 후 서버 API/RPC로만 내려줘야 한다.
+- 연락처 조회 이력은 감사 로그로 남기고, 채팅 메시지에는 전화번호를 복사 저장하지 않는다.

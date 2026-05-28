@@ -26,7 +26,7 @@ const chatFromContext = context => {
   return {
     id: context.id,
     name: "매물 소유주",
-    office: listing.ownerPhone ? `연락처 ${listing.ownerPhone}` : "연락처 확인됨",
+    office: listing.fast ? "연락처 확인 완료" : "연락처 비공개",
     property: property || "등록 매물",
     unread: 0,
     mode: context.mode || (listing.fast ? "빠른의뢰" : "안심의뢰"),
@@ -318,7 +318,7 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
     appendMessage({
       senderKey: "toad-demo-system",
       senderName: "연락처 요청",
-      text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐고 010-1234-5678로 연락할 수 있어요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
+      text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐어요. 연락처는 채팅 메시지에 남기지 않아요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
     });
   };
   return (
@@ -371,7 +371,7 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
         {needsContactApproval && <div style={{ background: contactDecision === "approved" ? G.greenSoft : contactDecision === "rejected" ? "#F2F4F3" : G.goldSoft, border: `1px solid ${contactDecision === "approved" ? C.green : contactDecision === "rejected" ? C.line : C.gold}`, borderRadius: 16, padding: 14, alignSelf: "stretch", boxShadow: SH2 }}>
           <div style={{ fontSize: 13, fontWeight: 900, color: contactDecision === "approved" ? C.greenInk : contactDecision === "rejected" ? C.gray : C.goldInk, marginBottom: 5 }}>연락처 공개 요청</div>
           <div style={{ fontSize: 12, color: C.mid, lineHeight: 1.6 }}>
-            {contactDecision === "approved" ? "연락처가 공개됐어요. 차감 포인트는 사용 확정이에요." : contactDecision === "rejected" ? "요청을 거절했어요. 신청자 포인트는 자동 환불돼요." : canApproveContact ? "상대가 연락처 공개를 요청했어요. 공개하면 포인트 사용 확정, 거절하면 자동 환불돼요." : "소유주 승인 대기 중이에요. 거절되거나 24시간 안에 응답이 없으면 자동 환불돼요."}
+            {contactDecision === "approved" ? "연락처 공개가 승인됐어요. 연락처는 채팅 메시지에 남기지 않아요." : contactDecision === "rejected" ? "요청을 거절했어요. 신청자 포인트는 자동 환불돼요." : canApproveContact ? "상대가 연락처 공개를 요청했어요. 공개하면 포인트 사용 확정, 거절하면 자동 환불돼요." : "소유주 승인 대기 중이에요. 거절되거나 24시간 안에 응답이 없으면 자동 환불돼요."}
           </div>
           {!contactDecision && canApproveContact && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
