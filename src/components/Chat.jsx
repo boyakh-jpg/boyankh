@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G, SH2 } from "../theme";
-import { CHATS } from "../data/data";
 import { CACHE_KEYS, loadCache, saveCache, loadChatContexts, loadChatContextsForUser, syncCache, syncChatContexts } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
@@ -53,6 +52,7 @@ const findMatchingListing = (listing, properties = []) => {
 const enrichChatContext = (context, properties = [], users = []) => {
   if (!context?.listing) return context;
   const matchedListing = findMatchingListing(context.listing, properties);
+  if (properties.length > 0 && !matchedListing) return null;
   const listing = matchedListing ? { ...context.listing, ...matchedListing } : { ...context.listing };
   const ownerKey = listing.ownerKey || listing.owner_key || context.ownerKey || fallbackOwnerKeyFromListing(listing);
   const ownerLabel = ownerLabelMissing(listing.ownerLabel || listing.ownerName)
@@ -189,15 +189,22 @@ const upsertMessageRow = (messages, row) => {
   return [...messages, next];
 };
 
-const chatsForRole = (role, demoUser = getDemoUser()) => [
-  DEMO_TEST_CHAT,
-  ...CHATS.filter(c => {
-    if (role === "broker") return c.mode !== "직거래";
-    if (role === "buyer") return c.mode === "직거래";
-    if (role === "owner") return c.ownerKey === demoUser.id;
-    return false;
-  }),
-];
+const chatsForRole = () => [];
+
+const missingChatForId = chatId => ({
+  id: chatId || "missing-chat",
+  name: "대화방 없음",
+  office: "삭제된 대화",
+  property: "삭제되었거나 만료된 대화",
+  unread: 0,
+  mode: "안내",
+  expired: true,
+  messages: [
+    { from: "broker", senderKey: "toad-demo-system", senderName: "채팅 안내", text: "이 대화방은 현재 매물 데이터와 연결되지 않아요.", time: "방금 전" },
+  ],
+});
+
+const fallbackChatForId = chatId => chatId === DEMO_TEST_CHAT.id ? DEMO_TEST_CHAT : missingChatForId(chatId);
 
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole, properties = [], demoUsers = [] }) {
   const demoUser = getDemoUser(demoUsers.length ? demoUsers : undefined);
@@ -311,7 +318,7 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
   const rawContext = chatContext?.id === chatId ? chatContext : loadChatContexts().find(context => context.id === chatId);
   const storedContext = enrichChatContext(rawContext, properties, demoUsers);
   const contextChat = storedContext ? chatFromContext(storedContext, role) : null;
-  const chat = contextChat || chatsForRole(role, demoUser).find(c => c.id === chatId) || DEMO_TEST_CHAT;
+  const chat = contextChat || fallbackChatForId(chatId);
   const accessDenied =
     (role === "owner" && chat.ownerKey && chat.ownerKey !== demoUser.id) ||
     (role === "buyer" && chat.buyerKey && chat.buyerKey !== demoUser.id) ||

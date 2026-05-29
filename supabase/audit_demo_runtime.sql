@@ -174,6 +174,60 @@ and table_name = 'chat_messages'
 
 union all
 
+select 'legacy_chat_messages', jsonb_build_object(
+  'invalid_thread_count', (
+    with valid_threads as (
+      select 'demo-test-chat'::text as thread_id
+      union
+      select 'listing-' || listings.id::text || '-' || demo_users.id
+      from public.listings
+      cross join public.demo_users
+      where demo_users.role = 'broker'
+      union
+      select 'direct-' || listings.id::text || '-' || demo_users.id
+      from public.listings
+      cross join public.demo_users
+      where demo_users.role = 'buyer'
+    )
+    select count(*)
+    from public.chat_messages
+    where not exists (
+      select 1
+      from valid_threads
+      where valid_threads.thread_id = chat_messages.thread_id
+    )
+  ),
+  'invalid_thread_ids', (
+    with valid_threads as (
+      select 'demo-test-chat'::text as thread_id
+      union
+      select 'listing-' || listings.id::text || '-' || demo_users.id
+      from public.listings
+      cross join public.demo_users
+      where demo_users.role = 'broker'
+      union
+      select 'direct-' || listings.id::text || '-' || demo_users.id
+      from public.listings
+      cross join public.demo_users
+      where demo_users.role = 'buyer'
+    )
+    select coalesce(jsonb_agg(thread_id order by thread_id), '[]'::jsonb)
+    from (
+      select distinct chat_messages.thread_id
+      from public.chat_messages
+      where not exists (
+        select 1
+        from valid_threads
+        where valid_threads.thread_id = chat_messages.thread_id
+      )
+      order by chat_messages.thread_id
+      limit 20
+    ) invalid_threads
+  )
+)
+
+union all
+
 select 'sample_owner_001_listings', coalesce(jsonb_agg(jsonb_build_object(
   'demo_listing_id', demo_listing_id,
   'owner_key', owner_key,

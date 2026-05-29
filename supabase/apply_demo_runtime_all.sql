@@ -1008,3 +1008,62 @@ set listing_title = listings.region || ' ' || listings.dong || ' ' || listings.c
 from public.listings as listings
 where direct_buyer_proposals.listing_id = listings.demo_listing_id
   and listings.demo_listing_id like 'listing-%';
+
+-- ============================================================
+-- supabase\migrations\202605290009_cleanup_legacy_chats.sql
+-- ============================================================
+-- ?덉쟾 ?붾? 梨꾪똿 硫붿떆吏? ??젣??留ㅻЪ???곌껐??梨꾪똿 而⑦뀓?ㅽ듃瑜??뺣━?쒕떎.
+
+with valid_threads as (
+  select 'demo-test-chat'::text as thread_id
+  union
+  select 'listing-' || listings.id::text || '-' || demo_users.id
+  from public.listings
+  cross join public.demo_users
+  where demo_users.role = 'broker'
+  union
+  select 'direct-' || listings.id::text || '-' || demo_users.id
+  from public.listings
+  cross join public.demo_users
+  where demo_users.role = 'buyer'
+)
+delete from public.chat_messages as chat_messages
+where not exists (
+  select 1
+  from valid_threads
+  where valid_threads.thread_id = chat_messages.thread_id
+);
+
+update public.chats
+set
+  payload = coalesce((
+    select jsonb_agg(context)
+    from jsonb_array_elements(payload) as context
+    where exists (
+      select 1
+      from public.listings
+      where listings.id::text = context->'listing'->>'id'
+         or listings.demo_listing_id = context->'listing'->>'demoListingId'
+         or listings.demo_listing_id = context->'listing'->>'demo_listing_id'
+    )
+  ), '[]'::jsonb),
+  updated_at = now()
+where state_key = 'toad.chatContexts'
+  and jsonb_typeof(payload) = 'array';
+
+update public.demo_app_state
+set
+  payload = coalesce((
+    select jsonb_agg(context)
+    from jsonb_array_elements(payload) as context
+    where exists (
+      select 1
+      from public.listings
+      where listings.id::text = context->'listing'->>'id'
+         or listings.demo_listing_id = context->'listing'->>'demoListingId'
+         or listings.demo_listing_id = context->'listing'->>'demo_listing_id'
+    )
+  ), '[]'::jsonb),
+  updated_at = now()
+where state_key = 'toad.chatContexts'
+  and jsonb_typeof(payload) = 'array';
