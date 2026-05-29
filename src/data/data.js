@@ -168,7 +168,7 @@ export const DEAL_TYPES_BY_PROP = {
 
 const officeTier = percentile => percentile <= 3 ? "지역 대표 부동산" : percentile <= 10 ? "지역 파워 부동산" : percentile <= 30 ? "지역 우수 부동산" : "검증 부동산";
 
-export const BROKER_OFFICES = [
+const STATIC_BROKER_OFFICES = [
   {
     id: "bo1",
     officeName: "마포 스마트공인중개사",
@@ -261,6 +261,52 @@ export const BROKER_OFFICES = [
   },
 ];
 
+const BROKER_REGIONS = ["강남구", "서초구", "송파구", "강동구", "마포구", "용산구", "성동구", "영등포구"];
+const BROKER_DONGS = ["역삼동", "반포동", "잠실동", "천호동", "공덕동", "이촌동", "성수동", "여의도동"];
+const BROKER_TYPES = ["아파트", "오피스텔", "빌라", "상가"];
+const BROKER_NAMES = ["김민준", "이수연", "박지훈", "최은영", "정하늘", "오하린", "서민재", "강도윤", "한유진", "문지성"];
+const padBroker = value => String(value).padStart(3, "0");
+
+export const BROKER_OFFICES = Array.from({ length: 30 }, (_, index) => {
+  const base = STATIC_BROKER_OFFICES[index % STATIC_BROKER_OFFICES.length];
+  const n = index + 1;
+  const id = `office-${padBroker(n)}`;
+  const region = BROKER_REGIONS[index % BROKER_REGIONS.length];
+  const dong = BROKER_DONGS[index % BROKER_DONGS.length];
+  const mainType = BROKER_TYPES[index % BROKER_TYPES.length];
+  const percentile = 3 + ((n * 7) % 35);
+  const verifiedDeals12m = 12 + ((n * 3) % 60);
+  return {
+    ...base,
+    id,
+    brokerUserId: `broker-${padBroker(n)}`,
+    officeName: `${region} 토드공인중개사 ${String(n).padStart(2, "0")}`,
+    agentName: BROKER_NAMES[index % BROKER_NAMES.length],
+    licenseNo: `11${padBroker(n)}-2026-${String(10000 + n).padStart(5, "0")}`,
+    address: `서울 ${region} ${dong} ${100 + n}`,
+    phone: `02-${String(7000 + n).padStart(4, "0")}-${String(2000 + n).padStart(4, "0")}`,
+    region,
+    specialtyRegions: Array.from(new Set([region, BROKER_REGIONS[(index + 3) % BROKER_REGIONS.length]])),
+    specialtyTypes: Array.from(new Set([mainType, "아파트"])),
+    verifiedDeals12m,
+    percentileInRegion: percentile,
+    tier: officeTier(percentile),
+    reviewCount: 3 + ((n * 5) % 35),
+    responseMode: ["chat", "call", "sms"][index % 3],
+    businessHours: index % 4 === 0 ? "평일 09:00-20:00 · 토 10:00-16:00" : "평일 09:00-18:00",
+    lastActive: index % 3 === 0 ? "방금 전 제안" : index % 3 === 1 ? "오늘 활동" : "어제 활동",
+    proposalMessage: `${region} ${dong} 실거래와 매수 수요를 기준으로 오늘 제안 가능해요.`,
+    reviews: [
+      {
+        id: `review-${id}`,
+        tags: ["일정 조율이 빨라요", "동네 시세를 잘 알아요"],
+        text: `${region} ${dong} 매물 진행 상황을 구체적으로 공유해줬어요.`,
+        createdAt: "2026-05-29",
+      },
+    ],
+  };
+});
+
 export const OWNER_DEMO_ACTIVE_COUNT = 2;
 export const PROPOSAL_CHAT_IDS = { bo1: "c1", bo2: "c5", bo3: "c6", bo4: "c2" };
 const PROPOSAL_LISTING_TITLES = {
@@ -269,6 +315,7 @@ const PROPOSAL_LISTING_TITLES = {
   bo3: "마포구 공덕동 래미안5차 · 84㎡",
   bo4: "송파구 잠실동 리센츠 · 59㎡",
 };
+const proposalActivityType = title => title?.includes("래미안5차") ? "빠른의뢰" : "안심의뢰";
 export const INTEREST_BROKERS = BROKER_OFFICES.slice(0, 4).map(o => ({
   ...o,
   name: o.agentName,
@@ -276,6 +323,7 @@ export const INTEREST_BROKERS = BROKER_OFFICES.slice(0, 4).map(o => ({
   deals: o.verifiedDeals12m,
   msg: o.proposalMessage,
   listingTitle: PROPOSAL_LISTING_TITLES[o.id],
+  activityType: proposalActivityType(PROPOSAL_LISTING_TITLES[o.id]),
   proposalNew: ["bo1", "bo4"].includes(o.id),
   chatId: PROPOSAL_CHAT_IDS[o.id] || null,
 }));

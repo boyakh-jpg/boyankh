@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { C, G, SH1 } from "../theme";
 import { useEffect } from "react";
 import { Frog, RoleToggle, StatCard, ListSheet, BrokerOfficeCard, FeeEstimate, PriceTrend, PriceHistoryPanel, DoneBadge, Tag, getNewProposalItems, getOwnerProposalItems } from "./common";
@@ -234,7 +234,7 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   if (role === "broker") {
     return (
       <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>} 
+        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>}
         <Header role={role} availableRoles={availableRoles} title="공인중개사 홈" subtitle="중개 매물이 있어요" mood="smug" onSwitchRole={onSwitchRole} actionLabel="매물 보기" onAction={() => onBrokerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -263,7 +263,7 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   if (role === "buyer") {
     return (
       <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>} 
+        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>}
         <Header role={role} availableRoles={availableRoles} title="직거래 홈" subtitle="쉽게 집을 찾아요" mood="cool" onSwitchRole={onSwitchRole} actionLabel="직거래 매물 보기" onAction={() => onBuyerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -290,8 +290,8 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} viewerKey={demoUser.id} itemsOverride={(typeof sheet === "string" ? sheet : sheet.kind) === "broker" ? ownerBrokerProposalItems : ownerDirectProposalItems} onClose={() => setSheet(null)} onProposalStateChange={updateProposalState}/>} 
-      {officeDetail && <OfficeDetail office={officeDetail} contracted={contractedOfficeId === officeDetail.id} onContract={setContractedOfficeId} onClose={() => setOfficeDetail(null)}/>} 
+      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} viewerKey={demoUser.id} itemsOverride={(typeof sheet === "string" ? sheet : sheet.kind) === "broker" ? ownerBrokerProposalItems : ownerDirectProposalItems} onClose={() => setSheet(null)} onProposalStateChange={updateProposalState}/>}
+      {officeDetail && <OfficeDetail office={officeDetail} contracted={contractedOfficeId === officeDetail.id} onContract={setContractedOfficeId} onClose={() => setOfficeDetail(null)}/>}
       <Header role={role} availableRoles={availableRoles} title="소유주 홈" subtitle="빠르게 집을 내놓아요" mood="calm" onSwitchRole={onSwitchRole} actionLabel="매물 의뢰하기" onAction={onRegister}/>
       <div style={{ padding: "18px 16px 0" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>

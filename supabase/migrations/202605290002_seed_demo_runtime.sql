@@ -177,17 +177,17 @@ where owner_key like 'owner-%'
    or owner_key in ('toad-demo-owner', 'toad-demo-owner-2');
 
 insert into public.demo_users (id, role, name, label, description, region, phone)
-select 'owner-' || lpad(g::text, 3, '0'), 'owner', 'Owner ' || g, 'Owner ' || lpad(g::text, 2, '0'), 'Listing owner demo account',
+select 'owner-' || lpad(g::text, 3, '0'), 'owner', '소유주 ' || lpad(g::text, 3, '0'), '소유주 ' || lpad(g::text, 3, '0'), '매물 등록 테스트 소유주',
        (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1],
        '010-' || lpad((3100 + g)::text, 4, '0') || '-' || lpad((7000 + g)::text, 4, '0')
 from generate_series(1, 20) as g
 union all
-select 'broker-' || lpad(g::text, 3, '0'), 'broker', 'Broker ' || g, 'Broker ' || lpad(g::text, 2, '0'), 'Broker demo account',
+select 'broker-' || lpad(g::text, 3, '0'), 'broker', '중개사 ' || lpad(g::text, 3, '0'), '중개사 ' || lpad(g::text, 3, '0'), '부동산 상세카드 테스트 중개사',
        (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1],
        '010-' || lpad((4100 + g)::text, 4, '0') || '-' || lpad((6000 + g)::text, 4, '0')
 from generate_series(1, 30) as g
 union all
-select 'buyer-' || lpad(g::text, 3, '0'), 'buyer', 'Direct buyer ' || g, 'Direct buyer ' || lpad(g::text, 2, '0'), 'Direct buyer demo account',
+select 'buyer-' || lpad(g::text, 3, '0'), 'buyer', '직거래 매수자 ' || lpad(g::text, 3, '0'), '직거래 매수자 ' || lpad(g::text, 3, '0'), '직거래 매수 테스트 계정',
        (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1],
        '010-' || lpad((5100 + g)::text, 4, '0') || '-' || lpad((5000 + g)::text, 4, '0')
 from generate_series(1, 10) as g;
@@ -210,8 +210,8 @@ insert into public.broker_offices (
 select
   id,
   broker_user_id,
-  region || ' Toad Realty ' || lpad(g::text, 2, '0'),
-  'Agent ' || lpad(g::text, 2, '0'),
+  region || ' 토드공인중개사 ' || lpad(g::text, 2, '0'),
+  '공인중개사 ' || lpad(g::text, 2, '0'),
   '11' || lpad(g::text, 3, '0') || '-2026-' || lpad((100 + g)::text, 5, '0'),
   'Seoul ' || region || ' office ' || (100 + g),
   '02-' || lpad((7000 + g)::text, 4, '0') || '-' || lpad((2000 + g)::text, 4, '0'),
@@ -225,8 +225,8 @@ select
   (array['chat','call','sms'])[(g - 1) % 3 + 1],
   '09:00-18:00',
   case when g % 3 = 0 then 'before close' when g % 3 = 1 then 'active today' else 'active yesterday' end,
-  'Area demand and schedule verified. Proposal can be handled today.',
-  jsonb_build_array(jsonb_build_object('id', 'review-' || id, 'tags', array['fast','accurate'], 'text', 'Good follow-up.', 'createdAt', '2026-05-29'))
+  '지역 수요와 방문 일정을 확인했습니다. 오늘 바로 제안 가능해요.',
+  jsonb_build_array(jsonb_build_object('id', 'review-' || id, 'tags', array['빠른 응답','시세 설명'], 'text', '진행 상황을 구체적으로 공유해줬어요.', 'createdAt', '2026-05-29'))
 from offices;
 
 with seed as (
@@ -293,7 +293,7 @@ select
   2,
   'negotiable',
   'none',
-  'Owner seeded demo listing.',
+  '소유주 계정으로 등록된 테스트 매물입니다.',
   '200k monthly',
   'available',
   'south',
@@ -371,9 +371,9 @@ select
   l.owner_key,
   'buyer-' || lpad((((g - 1) % 10) + 1)::text, 3, '0'),
   l.demo_listing_id,
-  'Direct buyer ' || lpad(((((g - 1) % 10) + 1)::text), 2, '0'),
-  case when g % 2 = 0 then 'Live-in buyer, loan prechecked' else 'Investor, fast closing possible' end,
-  case when l.deal_type in ('Monthly','Lease') then 'Monthly ' || (120 + g * 3) || 'm possible' else ((l.price_num / 10000) + 1) || 'eok range' end,
+  '직거래 매수자 ' || lpad(((((g - 1) % 10) + 1)::text), 3, '0'),
+  case when g % 2 = 0 then '실거주 목적, 대출 사전심사 완료' else '투자 목적, 빠른 잔금 협의 가능' end,
+  case when l.deal_type in ('Monthly','Lease') then '월 ' || (120 + g * 3) || '만 가능' else ((l.price_num / 10000) + 1) || '억대 가능' end,
   case when g % 3 = 0 then U&'\C5F4\B78C' else U&'\C548\C2EC\C758\B8B0' end,
   case when l.owner_key = 'owner-001' then g in (1, 41) else g % 5 = 0 end,
   case when g % 3 = 0 then null else 'direct-request-' || lpad(g::text, 3, '0') end,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G } from "./theme";
-import { CHATS } from "./data/data";
+import { BROKER_OFFICES, CHATS } from "./data/data";
 import { Splash, Login, Role } from "./components/Onboarding";
 import { Register } from "./components/Register";
 import { Home } from "./components/Home";
@@ -14,7 +14,7 @@ import { Settings } from "./components/Settings";
 import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
-import { getDemoUser } from "./data/demoUsers";
+import { DEMO_USERS, getDemoUser } from "./data/demoUsers";
 import { loadBackendState, loadLocalState, saveBackendState, saveChatContext } from "./data/cache";
 import { loadDemoEnvironment } from "./data/supabaseData";
 
@@ -195,8 +195,8 @@ export default function App() {
   const [buyerPreset, setBuyerPreset] = useState({});
   const [myListPreset, setMyListPreset] = useState({});
   const [settingsHydrated, setSettingsHydrated] = useState(false);
-  const [demoUsers, setDemoUsers] = useState([]);
-  const [brokerOffices, setBrokerOffices] = useState([]);
+  const [demoUsers, setDemoUsers] = useState(DEMO_USERS);
+  const [brokerOffices, setBrokerOffices] = useState(BROKER_OFFICES);
   const [brokerProposals, setBrokerProposals] = useState([]);
   const [directBuyerProposals, setDirectBuyerProposals] = useState([]);
   const contentRef = useRef(null);
@@ -204,11 +204,12 @@ export default function App() {
     let alive = true;
     loadDemoEnvironment().then(env => {
       if (!alive) return;
-      setDemoUsers(env.demoUsers);
-      setBrokerOffices(env.brokerOffices);
+      const nextDemoUsers = env.demoUsers.length ? env.demoUsers : DEMO_USERS;
+      setDemoUsers(nextDemoUsers);
+      setBrokerOffices(env.brokerOffices.length ? env.brokerOffices : BROKER_OFFICES);
       setBrokerProposals(env.brokerProposals);
       setDirectBuyerProposals(env.directBuyerProposals);
-      setDemoUser(getDemoUser(env.demoUsers));
+      setDemoUser(getDemoUser(nextDemoUsers));
     });
     return () => { alive = false; };
   }, []);
@@ -450,18 +451,18 @@ export default function App() {
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {screen === "splash" && <Splash onNext={() => setScreen("login")}/>}
           {screen === "login" && <Login onLogin={type => { setAccountType(type); setScreen("role"); }}/>}
-          {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>} 
-          {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>} 
-          {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>} 
-          {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>} 
-          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>} 
-          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>} 
-          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>} 
-          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>} 
-          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>} 
-          {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>} 
-          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>} 
-          {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>} 
+          {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
+          {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
+          {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
+          {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
+          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
+          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>}
+          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
+          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
+          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>}
+          {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
+          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>}
+          {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}
           {screen === "profile" && role !== "broker" && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: G.pageBg }}>
               <Frog mood="sleepy" size={110} animate/>
@@ -484,7 +485,7 @@ export default function App() {
             ))}
           </div>
         )}
-        {!['splash', 'login', 'role', 'chatroom'].includes(screen) && (
+        {!["splash", "login", "role", "chatroom"].includes(screen) && (
           <button onClick={() => contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })} style={{ position: "absolute", right: 18, bottom: noMenu ? 18 : 96, width: 42, height: 42, borderRadius: 21, border: `1px solid ${C.line}`, background: "#fff", color: C.greenInk, fontSize: 18, fontWeight: 900, cursor: "pointer", zIndex: 35, boxShadow: "0 8px 20px rgba(60,90,70,.18)", fontFamily: "inherit" }}>↑</button>
         )}
         {/* 전역 모달 - 폰 프레임 직속이라 스크롤 위치와 무관하게 항상 화면 기준으로 뜸 */}

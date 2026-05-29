@@ -1,10 +1,29 @@
 export const DEMO_USER_STORAGE_KEY = "toad.demoOwnerKey";
 
+const DEMO_REGIONS = ["강남구", "서초구", "송파구", "강동구", "마포구", "용산구", "성동구", "영등포구"];
+const pad = value => String(value).padStart(3, "0");
+const phone = (front, back) => `010-${String(front).padStart(4, "0")}-${String(back).padStart(4, "0")}`;
+
+const makeDemoUsers = ({ count, role, prefix, label, desc, phoneFront }) =>
+  Array.from({ length: count }, (_, index) => {
+    const n = index + 1;
+    const id = `${prefix}-${pad(n)}`;
+    const display = `${label} ${pad(n)}`;
+    return {
+      id,
+      name: display,
+      role,
+      label: display,
+      desc,
+      region: DEMO_REGIONS[index % DEMO_REGIONS.length],
+      phone: phone(phoneFront + n, 7000 + n),
+    };
+  });
+
 export const DEMO_USERS = [
-  { id: "toad-demo-owner", name: "소유주 A", role: "owner", label: "소유주 A", desc: "기본 테스트 소유주" },
-  { id: "toad-demo-owner-2", name: "소유주 B", role: "owner", label: "소유주 B", desc: "다른 소유주 채팅 테스트" },
-  { id: "toad-demo-broker-1", name: "중개사 김", role: "broker", label: "중개사 김", desc: "중개사 채팅/열람 테스트" },
-  { id: "toad-demo-buyer-1", name: "직거래 박", role: "buyer", label: "직거래 박", desc: "직거래 채팅 테스트" },
+  ...makeDemoUsers({ count: 20, role: "owner", prefix: "owner", label: "소유주", desc: "매물 등록 테스트 소유주", phoneFront: 3100 }),
+  ...makeDemoUsers({ count: 30, role: "broker", prefix: "broker", label: "중개사", desc: "부동산 상세카드 테스트 중개사", phoneFront: 4100 }),
+  ...makeDemoUsers({ count: 10, role: "buyer", prefix: "buyer", label: "직거래 매수자", desc: "직거래 매수 테스트 계정", phoneFront: 5100 }),
 ];
 
 export function getDemoUser(users = DEMO_USERS) {
