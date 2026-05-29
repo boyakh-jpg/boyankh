@@ -1015,12 +1015,12 @@ where direct_buyer_proposals.listing_id = listings.demo_listing_id
 -- ?덉쟾 ?붾? 梨꾪똿 硫붿떆吏? ??젣??留ㅻЪ???곌껐??梨꾪똿 而⑦뀓?ㅽ듃瑜??뺣━?쒕떎.
 
 with valid_threads as (
-  select 'listing-' || listings.id::text || '-' || demo_users.id
+  select 'listing-' || listings.id::text || '-' || demo_users.id as thread_id
   from public.listings
   cross join public.demo_users
   where demo_users.role = 'broker'
   union
-  select 'direct-' || listings.id::text || '-' || demo_users.id
+  select 'direct-' || listings.id::text || '-' || demo_users.id as thread_id
   from public.listings
   cross join public.demo_users
   where demo_users.role = 'buyer'

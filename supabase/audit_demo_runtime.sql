@@ -178,12 +178,12 @@ union all
 select 'legacy_chat_messages', jsonb_build_object(
   'invalid_thread_count', (
     with valid_threads as (
-      select 'listing-' || listings.id::text || '-' || demo_users.id
+      select 'listing-' || listings.id::text || '-' || demo_users.id as thread_id
       from public.listings
       cross join public.demo_users
       where demo_users.role = 'broker'
       union
-      select 'direct-' || listings.id::text || '-' || demo_users.id
+      select 'direct-' || listings.id::text || '-' || demo_users.id as thread_id
       from public.listings
       cross join public.demo_users
       where demo_users.role = 'buyer'
@@ -198,12 +198,12 @@ select 'legacy_chat_messages', jsonb_build_object(
   ),
   'invalid_thread_ids', (
     with valid_threads as (
-      select 'listing-' || listings.id::text || '-' || demo_users.id
+      select 'listing-' || listings.id::text || '-' || demo_users.id as thread_id
       from public.listings
       cross join public.demo_users
       where demo_users.role = 'broker'
       union
-      select 'direct-' || listings.id::text || '-' || demo_users.id
+      select 'direct-' || listings.id::text || '-' || demo_users.id as thread_id
       from public.listings
       cross join public.demo_users
       where demo_users.role = 'buyer'

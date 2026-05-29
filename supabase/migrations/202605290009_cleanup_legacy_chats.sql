@@ -1,12 +1,12 @@
 -- 예전 더미 채팅 메시지와 삭제된 매물에 연결된 채팅 컨텍스트를 정리한다.
 
 with valid_threads as (
-  select 'listing-' || listings.id::text || '-' || demo_users.id
+  select 'listing-' || listings.id::text || '-' || demo_users.id as thread_id
   from public.listings
   cross join public.demo_users
   where demo_users.role = 'broker'
   union
-  select 'direct-' || listings.id::text || '-' || demo_users.id
+  select 'direct-' || listings.id::text || '-' || demo_users.id as thread_id
   from public.listings
   cross join public.demo_users
   where demo_users.role = 'buyer'
