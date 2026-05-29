@@ -1,6 +1,6 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { C, G } from "./theme";
-import { PROPERTIES, CHATS } from "./data/data";
+import { CHATS } from "./data/data";
 import { Splash, Login, Role } from "./components/Onboarding";
 import { Register } from "./components/Register";
 import { Home } from "./components/Home";
@@ -16,6 +16,7 @@ import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { getDemoUser } from "./data/demoUsers";
 import { loadBackendState, loadLocalState, saveBackendState, saveChatContext } from "./data/cache";
+import { loadDemoEnvironment } from "./data/supabaseData";
 
 const loadSetting = (key, fallback) => {
   const saved = loadLocalState(key, null);
@@ -40,13 +41,23 @@ const roleAccessFor = (demoRole, accountType) => {
   return ["owner", "buyer"];
 };
 const OWNER_KEY = "toad-demo-owner";
+const requireAuthUser = async action => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) {
+    console.error(`Supabase auth required for ${action}:`, error || "no authenticated user");
+    if (typeof window !== "undefined") window.alert("로그인 후 이용할 수 있어요.");
+    return null;
+  }
+  return data.user;
+};
 const demoOwnerPhoneFor = id => {
   const n = String(id || "demo").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
   return `010-${String(2300 + (n % 7000)).padStart(4, "0")}-${String(1000 + ((n * 17) % 9000)).padStart(4, "0")}`;
 };
-const LISTING_PUBLIC_COLUMNS = "id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo";
+const LISTING_PUBLIC_COLUMNS = "id,demo_listing_id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo";
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
+  demoListingId: row.demoListingId || row.demo_listing_id || null,
   mine: row.mine || row.owner_key === ownerKey,
   ownerKey: row.ownerKey || row.owner_key || (row.mine ? ownerKey : null),
   ownerPhone: row.ownerPhone || row.owner_phone || demoOwnerPhoneFor(row.id),
@@ -91,9 +102,10 @@ const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   tenantMonthly: row.tenantMonthly || row.tenant_monthly,
   tenantMemo: row.tenantMemo || row.tenant_memo,
 });
-const listingToInsertRow = (p, ownerKey = OWNER_KEY) => ({
+const listingToInsertRow = (p, ownerKey = OWNER_KEY, userId = null) => ({
   title: p.complex || "새 매물",
   owner_key: ownerKey,
+  ...(userId ? { user_id: userId } : {}),
   price: p.priceNum || 0,
   address: `${p.region || ""} ${p.dong || ""}`.trim(),
   region: p.region,
@@ -183,7 +195,23 @@ export default function App() {
   const [buyerPreset, setBuyerPreset] = useState({});
   const [myListPreset, setMyListPreset] = useState({});
   const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const [demoUsers, setDemoUsers] = useState([]);
+  const [brokerOffices, setBrokerOffices] = useState([]);
+  const [brokerProposals, setBrokerProposals] = useState([]);
+  const [directBuyerProposals, setDirectBuyerProposals] = useState([]);
   const contentRef = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    loadDemoEnvironment().then(env => {
+      if (!alive) return;
+      setDemoUsers(env.demoUsers);
+      setBrokerOffices(env.brokerOffices);
+      setBrokerProposals(env.brokerProposals);
+      setDirectBuyerProposals(env.directBuyerProposals);
+      setDemoUser(getDemoUser(env.demoUsers));
+    });
+    return () => { alive = false; };
+  }, []);
   useEffect(() => {
     let alive = true;
     Promise.all([
@@ -206,7 +234,7 @@ export default function App() {
     contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [screen]);
   // ===== 공용 매물 store (owner/broker/buyer가 같은 데이터를 봄) =====
-  const [properties, setProperties] = useState(() => PROPERTIES.map(p => normalizeListing(p, OWNER_KEY)));
+  const [properties, setProperties] = useState([]);
   useEffect(() => {
     async function loadListings() {
       const { data, error } = await supabase
@@ -227,7 +255,9 @@ export default function App() {
   }, [demoUser.id]);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
   const addProperty = async p => {
-    const insertRow = listingToInsertRow(p, demoUser.id);
+    const authUser = await requireAuthUser("insert listing");
+    if (!authUser) return;
+    const insertRow = listingToInsertRow(p, authUser.id, authUser.id);
     let { data, error } = await supabase
       .from("listings")
       .insert(insertRow)
@@ -235,7 +265,8 @@ export default function App() {
       .single();
 
     if (error && error.message?.includes("owner_key")) {
-      const { owner_key, ...fallbackRow } = insertRow;
+      const fallbackRow = { ...insertRow };
+      delete fallbackRow.owner_key;
       ({ data, error } = await supabase
         .from("listings")
         .insert(fallbackRow)
@@ -245,25 +276,31 @@ export default function App() {
 
     if (error) {
       console.error("Supabase insert listing error:", error);
-      setProperties(prev => [{ ...p, mine: true, ownerKey: demoUser.id }, ...prev]);
+      if (typeof window !== "undefined") window.alert("매물 등록에 실패했어요.");
       return;
     }
 
-    setProperties(prev => [{ ...normalizeListing(data, demoUser.id), mine: true, ownerKey: demoUser.id }, ...prev]);
+    setProperties(prev => [{ ...normalizeListing(data, authUser.id), mine: true, ownerKey: authUser.id }, ...prev]);
   };
   // 거래 완료/되돌리기 토글
   const setDealDone = async (id, done) => {
+    if (!(await requireAuthUser("update listing status"))) return;
     const patch = { status: done ? "done" : "active", completedDaysAgo: done ? 0 : null };
     const { error } = await supabase
       .from("listings")
       .update(listingPatchToRow(patch))
       .eq("id", id);
 
-    if (error) console.error("Supabase update listing status error:", error);
+    if (error) {
+      console.error("Supabase update listing status error:", error);
+      if (typeof window !== "undefined") window.alert("매물 수정에 실패했어요.");
+      return;
+    }
     setProperties(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   };
   // 의뢰 기한 2주 연장
   const extendTerm = async id => {
+    if (!(await requireAuthUser("extend listing term"))) return;
     const current = properties.find(p => p.id === id);
     const nextDays = (current?.expiresInDays ?? 14) + 14;
     const patch = { expiresInDays: nextDays };
@@ -272,10 +309,15 @@ export default function App() {
       .update(listingPatchToRow(patch))
       .eq("id", id);
 
-    if (error) console.error("Supabase extend listing term error:", error);
+    if (error) {
+      console.error("Supabase extend listing term error:", error);
+      if (typeof window !== "undefined") window.alert("매물 수정에 실패했어요.");
+      return;
+    }
     setProperties(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   };
   const updatePrice = async (id, priceNum, price, reason) => {
+    if (!(await requireAuthUser("update listing price"))) return;
     const current = properties.find(p => p.id === id);
     const priceHistory = [
       ...(current?.priceHistory?.length ? current.priceHistory : [{ date: "2026-05-01", priceNum: current?.priceNum || priceNum, reason: "최초 등록" }]),
@@ -293,10 +335,15 @@ export default function App() {
       .update(listingPatchToRow(patch))
       .eq("id", id);
 
-    if (error) console.error("Supabase update listing price error:", error);
+    if (error) {
+      console.error("Supabase update listing price error:", error);
+      if (typeof window !== "undefined") window.alert("매물 수정에 실패했어요.");
+      return;
+    }
     setProperties(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   };
   const updateListingInfo = async (id, patch) => {
+    if (!(await requireAuthUser("update listing info"))) return;
     const nextPatch = {
       ...patch,
       updatedAgo: "방금 전",
@@ -307,7 +354,11 @@ export default function App() {
       .update(listingPatchToRow(nextPatch))
       .eq("id", id);
 
-    if (error) console.error("Supabase update listing info error:", error);
+    if (error) {
+      console.error("Supabase update listing info error:", error);
+      if (typeof window !== "undefined") window.alert("매물 수정에 실패했어요.");
+      return;
+    }
     setProperties(prev => prev.map(p => p.id === id ? { ...p, ...nextPatch } : p));
   };
   const closeModal = () => setModal(null);
@@ -362,7 +413,7 @@ export default function App() {
     if (k === "mylist") setMyListPreset({});
     setScreen(k);
   };
-  const roleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : demoUser.id === OWNER_KEY);
+  const roleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true);
   const totalUnread = roleChats.reduce((s, c) => s + c.unread, 0);
   const ownerMenus = [{ k: "home", label: "홈" }, { k: "register", label: "의뢰하기" }, { k: "offices", label: "부동산" }, { k: "chatlist", label: "채팅", badge: totalUnread }, { k: "mylist", label: "내 매물" }];
   const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
@@ -399,18 +450,18 @@ export default function App() {
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {screen === "splash" && <Splash onNext={() => setScreen("login")}/>}
           {screen === "login" && <Login onLogin={type => { setAccountType(type); setScreen("role"); }}/>}
-          {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
-          {screen === "home" && <Home properties={properties} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {screen === "offices" && <BrokerOffices role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
-          {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
-          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>}
-          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
-          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
-          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>}
-          {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>}
-          {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}
+          {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>} 
+          {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>} 
+          {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>} 
+          {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>} 
+          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>} 
+          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>} 
+          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>} 
+          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>} 
+          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>} 
+          {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>} 
+          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>} 
+          {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>} 
           {screen === "profile" && role !== "broker" && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: G.pageBg }}>
               <Frog mood="sleepy" size={110} animate/>
@@ -433,7 +484,7 @@ export default function App() {
             ))}
           </div>
         )}
-        {!["splash", "login", "role", "chatroom"].includes(screen) && (
+        {!['splash', 'login', 'role', 'chatroom'].includes(screen) && (
           <button onClick={() => contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })} style={{ position: "absolute", right: 18, bottom: noMenu ? 18 : 96, width: 42, height: 42, borderRadius: 21, border: `1px solid ${C.line}`, background: "#fff", color: C.greenInk, fontSize: 18, fontWeight: 900, cursor: "pointer", zIndex: 35, boxShadow: "0 8px 20px rgba(60,90,70,.18)", fontFamily: "inherit" }}>↑</button>
         )}
         {/* 전역 모달 - 폰 프레임 직속이라 스크롤 위치와 무관하게 항상 화면 기준으로 뜸 */}
