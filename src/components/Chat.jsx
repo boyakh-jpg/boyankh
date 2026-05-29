@@ -20,16 +20,22 @@ const DEMO_TEST_CHAT = {
   ],
 };
 
+const ownerLabelFromKey = key => {
+  if (!key) return "매물 소유주";
+  return String(key).startsWith("owner-") ? `소유주 ${String(key).replace("owner-", "")}` : String(key);
+};
+
 const chatFromContext = (context, role = "buyer") => {
   if (!context?.listing) return null;
   const listing = context.listing;
   const property = `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim();
+  const ownerLabel = listing.ownerLabel || listing.ownerName || ownerLabelFromKey(listing.ownerKey || listing.owner_key);
   const expired = isDone(listing) || isTermExpired(listing);
   const direct = context.mode === "직거래";
   const ownerView = role === "owner";
   const partnerName = ownerView
     ? (direct ? context.buyerName || "직거래 매수자" : context.brokerName || "공인중개사")
-    : "매물 소유주";
+    : ownerLabel;
   const noticeText = expired
     ? "매물 의뢰가 만료됐어요. 연락처 조회와 공개 요청은 다시 의뢰된 뒤 가능해요."
     : direct
@@ -44,6 +50,7 @@ const chatFromContext = (context, role = "buyer") => {
     mode: context.mode || (listing.fast ? "빠른의뢰" : "안심의뢰"),
     expired,
     ownerKey: listing.ownerKey || listing.owner_key || null,
+    ownerLabel,
     buyerKey: context.buyerKey || null,
     brokerKey: context.brokerKey || null,
     contactRequestId: context.contactRequestId || context.id,
@@ -79,10 +86,11 @@ const chatPartnerProfile = (chat, role, demoUser) => {
     };
   }
 
+  const ownerLabel = chat.ownerLabel || "매물 소유주";
   return {
-    name: "매물 소유주",
+    name: ownerLabel,
     subtitle: `${chat.property} 관련 대화 중`,
-    subtitleLines: [`${chat.property} 관련`, chat.office],
+    subtitleLines: [`${ownerLabel}와 대화 중`, chat.property],
     type: "소유주",
     office: chat.office,
     property: chat.property,
@@ -139,7 +147,7 @@ const chatsForRole = (role, demoUser = getDemoUser()) => [
   ...CHATS.filter(c => {
     if (role === "broker") return c.mode !== "직거래";
     if (role === "buyer") return c.mode === "직거래";
-    if (role === "owner") return demoUser.id === "toad-demo-owner";
+    if (role === "owner") return c.ownerKey === demoUser.id;
     return false;
   }),
 ];
@@ -229,6 +237,8 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
         {visibleChats.map(c => {
           const base = baseMessages(c);
           const last = latestByThread[c.id] || base[base.length - 1] || c.messages[c.messages.length - 1];
+          const chatName = role === "owner" ? c.name : (c.ownerLabel || "매물 소유주");
+          const propertyLabel = c.ownerLabel && role !== "owner" ? `${c.property} · ${c.ownerLabel}` : c.property;
           return (
             <div key={c.id} onClick={() => onOpen(c.id)} style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2, cursor: "pointer", display: "flex", gap: 12, alignItems: "center" }}>
               <div style={{ position: "relative" }}>
@@ -236,8 +246,8 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
                 {c.unread > 0 && <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, background: "#E8847C", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{c.unread}</div>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{c.name}</span><Tag tone={c.mode==="안심의뢰"?"green":"gold"}>{c.mode}</Tag></div>
-                <div style={{ fontSize: 12, color: C.gray, margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.property}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{chatName}</span><Tag tone={c.mode==="안심의뢰"?"green":"gold"}>{c.mode}</Tag></div>
+                <div style={{ fontSize: 12, color: C.gray, margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{propertyLabel}</div>
                 <div style={{ fontSize: 13, color: c.unread>0?C.dark:C.gray, fontWeight: c.unread>0?600:400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{last.text}</div>
               </div>
               <span style={{ fontSize: 18, color: "#CBD5CD" }}>›</span>
@@ -413,7 +423,7 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
           <button onClick={() => setProfileOpen(true)} style={{ marginLeft: "auto", maxWidth: "72%", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, minWidth: 0 }}>
             <Frog mood={isDirect?"love":"calm"} size={40}/>
             <div style={{ minWidth: 0, textAlign: "left" }}>
-              <div style={{ color: "#fff", fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.name}</div>
+              <div style={{ color: "#fff", fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partner.name}</div>
               <div style={{ color: "#ffffffcc", fontSize: 11, fontWeight: 700, lineHeight: 1.35 }}>
                 {headerSubtitleLines.map(line => (
                   <div key={line} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{line}</div>
@@ -422,8 +432,9 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
             </div>
           </button>
         </div>
-        <div style={{ background: "#ffffff26", borderRadius: 12, padding: "8px 12px", marginTop: 12, fontSize: 12, color: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ opacity: .85 }}>매물</span><span style={{ fontWeight: 600 }}>{chat.property}</span>
+        <div style={{ background: "#ffffff26", borderRadius: 12, padding: "8px 12px", marginTop: 12, fontSize: 12, color: "#fff", display: "grid", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ opacity: .85 }}>매물</span><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.property}</span></div>
+          {chat.ownerLabel && role !== "owner" && <div style={{ color: "#ffffffd9", fontWeight: 800 }}>소유주 {chat.ownerLabel}</div>}
         </div>
         {canContractListing && (
           <button onClick={contractListing} disabled={contractedHere || contractedElsewhere} style={{ width: "100%", marginTop: 8, border: "none", background: contractedHere ? G.gold : contractedElsewhere ? "#D5DDD7" : "#fff", color: contractedHere ? "#fff" : contractedElsewhere ? C.gray : C.greenInk, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: contractedHere || contractedElsewhere ? "default" : "pointer", fontFamily: "inherit" }}>

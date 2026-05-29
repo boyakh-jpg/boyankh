@@ -226,6 +226,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   };
   const leaseBadge = l => l.dealType === "매매" && l.tenant === "있어요" ? (Number(l.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
   const ownerPhoneFor = l => l.ownerPhone || l.owner_phone || "010-2300-3891";
+  const ownerLabelFor = l => l.ownerLabel || l.ownerName || (String(l.ownerKey || "").startsWith("owner-") ? `소유주 ${String(l.ownerKey).replace("owner-", "")}` : l.ownerKey) || "소유주 미지정";
   const ContactOpenBox = ({ listing }) => (
     <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -254,6 +255,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
                 {listing.badge && !done && <Tag tone={listing.badge === "NEW" ? "green" : "gold"}>{listing.badge}</Tag>}
               </div>
               <div style={{ fontSize: 18, fontWeight: 900, color: C.dark }}>{listing.region} {listing.dong} {listing.complex}</div>
+              <div style={{ fontSize: 12, color: C.greenInk, fontWeight: 900, marginTop: 3 }}>소유주 {ownerLabelFor(listing)}</div>
               <div style={{ fontSize: 12, color: C.gray, marginTop: 3 }}>{listing.propType} {listing.dealType} · {listing.area}㎡ · {listing.floor}층</div>
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -269,6 +271,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
             <div style={{ fontSize: 14, fontWeight: 900, color: C.dark, marginBottom: 10 }}>매물 정보</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {[
+                ["소유주", ownerLabelFor(listing)],
                 ["지역", `${listing.region} ${listing.dong}`],
                 ["공급/전용", `${listing.supplyArea ? `${listing.supplyArea}㎡` : "미입력"} / ${(listing.exclusiveArea || listing.area) ? `${listing.exclusiveArea || listing.area}㎡` : "미입력"}`],
                 ["층수", `${listing.floor || "미입력"}${listing.totalFloor ? `/${listing.totalFloor}` : ""}층`],
@@ -340,7 +343,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
             <span style={{ fontSize: 12, fontWeight: 700, color: l.fast ? C.goldInk : C.greenInk }}>{l.fast ? "빠른의뢰" : "안심의뢰"}</span>
           </div>
         </div>
-        <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>{l.region} {l.dong} · {l.propType} {l.dealType}</div>
+        <div style={{ fontSize: 11, color: C.gray, marginBottom: 2 }}>{l.region} {l.dong} · {l.propType} {l.dealType} · 소유주 {ownerLabelFor(l)}</div>
         <div style={{ fontSize: 15, fontWeight: 700, color: C.dark }}>{l.complex}</div>
         <div style={{ fontSize: 12, color: C.gray, marginBottom: 8 }}>{l.area}㎡ · {l.floor}층</div>
         <div style={{ fontSize: 18, fontWeight: 900, color: C.dark, marginBottom: 6 }}>{l.price}</div>

@@ -51,6 +51,13 @@ const roleAccessFor = (demoRole, accountType) => {
   if (demoRole === "buyer") return ["buyer", "owner"];
   return ["owner", "buyer"];
 };
+const demoUserLabelFor = (users, key) => {
+  if (!key) return "소유주 미지정";
+  const user = users.find(item => item.id === key) || DEMO_USERS.find(item => item.id === key);
+  if (user) return user.label || user.name || key;
+  if (String(key).startsWith("owner-")) return `소유주 ${String(key).replace("owner-", "")}`;
+  return key;
+};
 const OWNER_KEY = "toad-demo-owner";
 const requireAuthUser = async action => {
   const { data, error } = await supabase.auth.getUser();
@@ -215,6 +222,10 @@ export default function App() {
     return cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {};
   });
   const contentRef = useRef(null);
+  const attachOwnerLabel = listing => {
+    const ownerKey = listing.ownerKey || listing.owner_key || null;
+    return { ...listing, ownerLabel: listing.ownerLabel || demoUserLabelFor(demoUsers, ownerKey) };
+  };
   useEffect(() => {
     let alive = true;
     loadDemoEnvironment().then(env => {
@@ -272,12 +283,12 @@ export default function App() {
       }
 
       if (Array.isArray(data) && data.length > 0) {
-        setProperties(applyListingContracts(data.map(row => normalizeListing(row, demoUser.id)), loadCache(CACHE_KEYS.listingContracts, {})));
+        setProperties(applyListingContracts(data.map(row => attachOwnerLabel(normalizeListing(row, demoUser.id))), loadCache(CACHE_KEYS.listingContracts, {})));
       }
     }
 
     loadListings();
-  }, [demoUser.id]);
+  }, [demoUser.id, demoUsers]);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
   const addProperty = async p => {
     const authUser = await requireAuthUser("insert listing");
@@ -305,7 +316,7 @@ export default function App() {
       return;
     }
 
-    setProperties(prev => [{ ...normalizeListing(data, authUser.id), mine: true, ownerKey: authUser.id }, ...prev]);
+    setProperties(prev => [{ ...normalizeListing(data, authUser.id), mine: true, ownerKey: authUser.id, ownerLabel: demoUser.label }, ...prev]);
   };
   // 거래 완료/되돌리기 토글
   const setDealDone = async (id, done) => {
@@ -406,7 +417,10 @@ export default function App() {
     }
     setScreen("chatroom");
   };
-  const listingWithOwner = listing => ({ ...listing, ownerKey: listing.ownerKey || listing.owner_key || null });
+  const listingWithOwner = listing => {
+    const ownerKey = listing.ownerKey || listing.owner_key || null;
+    return { ...listing, ownerKey, ownerLabel: listing.ownerLabel || demoUserLabelFor(demoUsers, ownerKey) };
+  };
   const openBrokerListingChat = listing => openChat({
     id: `listing-${listing.id}-${demoUser.id}`,
     listing: listingWithOwner(listing),
