@@ -15,14 +15,15 @@ import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { getDemoUser } from "./data/demoUsers";
-import { saveChatContext } from "./data/cache";
+import { loadBackendState, loadLocalState, saveBackendState, saveChatContext } from "./data/cache";
 
 const loadSetting = (key, fallback) => {
+  const saved = loadLocalState(key, null);
+  if (saved !== null && saved !== undefined) return saved;
   try {
     if (typeof window === "undefined") return fallback;
-    const saved = window.localStorage.getItem(key);
-    if (!saved) return fallback;
-    try { return JSON.parse(saved); } catch { return saved; }
+    const legacy = window.localStorage.getItem(key);
+    return legacy == null ? fallback : JSON.parse(legacy);
   } catch {
     return fallback;
   }
@@ -31,6 +32,7 @@ const saveSetting = (key, value) => {
   try {
     if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+  saveBackendState(key, value);
 };
 const roleAccessFor = (demoRole, accountType) => {
   if (demoRole === "broker" || accountType === "broker") return ["broker", "owner"];
@@ -180,10 +182,26 @@ export default function App() {
   const [brokerPreset, setBrokerPreset] = useState({});
   const [buyerPreset, setBuyerPreset] = useState({});
   const [myListPreset, setMyListPreset] = useState({});
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
   const contentRef = useRef(null);
-  useEffect(() => saveSetting("toad.preferredRegion", preferredRegion), [preferredRegion]);
-  useEffect(() => saveSetting("toad.interestRegion", interestRegion), [interestRegion]);
-  useEffect(() => saveSetting("toad.notifications", notifications), [notifications]);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      loadBackendState("toad.preferredRegion", preferredRegion),
+      loadBackendState("toad.interestRegion", interestRegion),
+      loadBackendState("toad.notifications", notifications),
+    ]).then(([nextPreferredRegion, nextInterestRegion, nextNotifications]) => {
+      if (!alive) return;
+      setPreferredRegion(nextPreferredRegion || "강남구");
+      setInterestRegion(nextInterestRegion || "마포구");
+      if (nextNotifications && typeof nextNotifications === "object" && !Array.isArray(nextNotifications)) setNotifications(nextNotifications);
+      setSettingsHydrated(true);
+    });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => { if (settingsHydrated) saveSetting("toad.preferredRegion", preferredRegion); }, [preferredRegion, settingsHydrated]);
+  useEffect(() => { if (settingsHydrated) saveSetting("toad.interestRegion", interestRegion); }, [interestRegion, settingsHydrated]);
+  useEffect(() => { if (settingsHydrated) saveSetting("toad.notifications", notifications); }, [notifications, settingsHydrated]);
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [screen]);

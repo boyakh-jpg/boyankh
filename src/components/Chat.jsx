@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G, SH2 } from "../theme";
 import { CHATS } from "../data/data";
-import { CACHE_KEYS, loadCache, saveCache, loadChatContexts, loadChatContextsForUser } from "../data/cache";
+import { CACHE_KEYS, loadCache, saveCache, loadChatContexts, loadChatContextsForUser, syncCache, syncChatContexts } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
 import { isTermExpired } from "../utils/helpers";
@@ -146,9 +146,19 @@ const chatsForRole = (role, demoUser = getDemoUser()) => [
 
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   const demoUser = getDemoUser();
-  const savedChats = loadChatContextsForUser(demoUser.id, role).map(context => chatFromContext(context, role)).filter(Boolean);
+  const [savedContexts, setSavedContexts] = useState(() => loadChatContextsForUser(demoUser.id, role));
+  const savedChats = savedContexts.map(context => chatFromContext(context, role)).filter(Boolean);
   const visibleChats = [...new Map([...chatsForRole(role, demoUser), ...savedChats].map(chat => [chat.id, chat])).values()];
+  const visibleChatIds = visibleChats.map(c => c.id).join("|");
   const [latestByThread, setLatestByThread] = useState({});
+
+  useEffect(() => {
+    let alive = true;
+    syncChatContexts().then(() => {
+      if (alive) setSavedContexts(loadChatContextsForUser(demoUser.id, role));
+    });
+    return () => { alive = false; };
+  }, [demoUser.id, role]);
 
   useEffect(() => {
     let alive = true;
@@ -201,7 +211,7 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, [role, demoUser.id]);
+  }, [role, demoUser.id, visibleChatIds]);
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%" }}>
@@ -258,6 +268,15 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
   });
   const listRef = useRef(null);
   const endRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    syncCache(CACHE_KEYS.contactDecisions, {}).then(next => {
+      if (!alive || !next || typeof next !== "object" || Array.isArray(next)) return;
+      setLocalContactDecision(next[decisionKey] || null);
+    });
+    return () => { alive = false; };
+  }, [decisionKey]);
 
   useEffect(() => {
     let alive = true;

@@ -1,7 +1,8 @@
 ﻿import { useState } from "react";
+import { useEffect } from "react";
 import { C, G, SH1, SH2 } from "../theme";
 import { BROKER_OFFICES, REGIONS, PROPOSAL_CHAT_IDS } from "../data/data";
-import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
+import { CACHE_KEYS, loadCache, saveCache, syncCache } from "../data/cache";
 import { BrokerOfficeCard, SelectBox, Frog, RoleToggle, Tag } from "./common";
 
 const responseModeLabel = {
@@ -79,6 +80,13 @@ function OfficeDetail({ office, contracted, onContract, onClose }) {
 export function BrokerOffices({ role = "owner", availableRoles, preferredRegion = "전체", interestRegion = "전체", onSwitchRole }) {
   const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
   const decisions = localDecisions && typeof localDecisions === "object" && !Array.isArray(localDecisions) ? localDecisions : {};
+  useEffect(() => {
+    let alive = true;
+    syncCache(CACHE_KEYS.contactDecisions, {}).then(next => {
+      if (alive && next && typeof next === "object" && !Array.isArray(next)) setLocalDecisions(next);
+    });
+    return () => { alive = false; };
+  }, []);
   const decide = (key, value) => {
     if (!key) return;
     setLocalDecisions(d => {

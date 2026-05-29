@@ -13,10 +13,93 @@ export const CACHE_KEYS = {
 };
 
 
+const APP_STATE_TABLE = "demo_app_state";
+const STATE_STORAGE_PREFIX = "toad.state";
 const memoryCache = {};
 const POINT_BALANCE_PREFIX = "toad.pointBalance";
 const CHAT_CONTEXTS_KEY = "toad.chatContexts";
 export const POINT_DEFAULTS = { owner: 12000, buyer: 30000, broker: 50000 };
+
+const stateStorageKey = key => `${STATE_STORAGE_PREFIX}.${key}`;
+
+const readLocalJson = (key, fallback) => {
+  try {
+    if (typeof window === "undefined") return fallback;
+    const saved = window.localStorage.getItem(key);
+    return saved == null ? fallback : JSON.parse(saved);
+  } catch {
+    return fallback;
+  }
+};
+
+const writeLocalJson = (key, value) => {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+};
+
+export function loadLocalState(key, fallback) {
+  return readLocalJson(stateStorageKey(key), fallback);
+}
+
+export function saveLocalState(key, value) {
+  writeLocalJson(stateStorageKey(key), value);
+  return value;
+}
+
+export async function loadBackendState(key, fallback) {
+  const local = loadLocalState(key, fallback);
+  try {
+    const { data, error } = await supabase
+      .from(APP_STATE_TABLE)
+      .select("payload")
+      .eq("state_key", key)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.payload !== undefined && data?.payload !== null) {
+      saveLocalState(key, data.payload);
+      return data.payload;
+    }
+  } catch (error) {
+    console.error("Supabase demo_app_state load error:", error);
+  }
+  return local;
+}
+
+export async function saveBackendState(key, value) {
+  saveLocalState(key, value);
+  try {
+    const { error } = await supabase
+      .from(APP_STATE_TABLE)
+      .upsert({ state_key: key, payload: value, updated_at: new Date().toISOString() }, { onConflict: "state_key" });
+    if (error) throw error;
+  } catch (error) {
+    console.error("Supabase demo_app_state save error:", error);
+  }
+  return value;
+}
+
+export const userStateKey = (userId, name) => `toad.${userId || "guest"}.${name}`;
+
+export function loadUserMapStateLocal(userId, name, fallback = {}) {
+  const key = userStateKey(userId, name);
+  const saved = loadLocalState(key, null);
+  if (saved && typeof saved === "object" && !Array.isArray(saved)) return saved;
+  const legacy = readLocalJson(key, fallback);
+  return legacy && typeof legacy === "object" && !Array.isArray(legacy) ? legacy : fallback;
+}
+
+export async function loadUserMapState({ userId, name, fallback = {} }) {
+  const value = await loadBackendState(userStateKey(userId, name), loadUserMapStateLocal(userId, name, fallback));
+  return value && typeof value === "object" && !Array.isArray(value) ? value : fallback;
+}
+
+export function saveUserMapState({ userId, name, value }) {
+  const key = userStateKey(userId, name);
+  writeLocalJson(key, value);
+  return saveBackendState(key, value);
+}
 
 export const getDefaultPointBalance = role => POINT_DEFAULTS[role] ?? POINT_DEFAULTS.owner;
 
@@ -98,14 +181,10 @@ const safeListingForChat = listing => ({
 });
 
 export function loadChatContexts() {
-  try {
-    if (typeof window === "undefined") return [];
-    const saved = window.localStorage.getItem(CHAT_CONTEXTS_KEY);
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const saved = loadLocalState(CHAT_CONTEXTS_KEY, null);
+  if (Array.isArray(saved)) return saved;
+  const legacy = readLocalJson(CHAT_CONTEXTS_KEY, []);
+  return Array.isArray(legacy) ? legacy : [];
 }
 
 export function saveChatContext(context) {
@@ -117,10 +196,15 @@ export function saveChatContext(context) {
       updatedAt: new Date().toISOString(),
     };
     const rest = loadChatContexts().filter(item => item.id !== context.id);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CHAT_CONTEXTS_KEY, JSON.stringify([nextContext, ...rest].slice(0, 80)));
-    }
+    const next = [nextContext, ...rest].slice(0, 80);
+    writeLocalJson(CHAT_CONTEXTS_KEY, next);
+    saveBackendState(CHAT_CONTEXTS_KEY, next);
   } catch {}
+}
+
+export async function syncChatContexts() {
+  const contexts = await loadBackendState(CHAT_CONTEXTS_KEY, loadChatContexts());
+  return Array.isArray(contexts) ? contexts : [];
 }
 
 export function loadChatContextsForUser(userId, role) {
@@ -133,10 +217,20 @@ export function loadChatContextsForUser(userId, role) {
 }
 
 export function loadCache(key, fallback) {
-  return memoryCache[key] ?? fallback;
+  if (Object.prototype.hasOwnProperty.call(memoryCache, key)) return memoryCache[key];
+  const local = loadLocalState(key, fallback);
+  memoryCache[key] = local;
+  return local;
 }
 
 export function saveCache(key, value) {
+  memoryCache[key] = value;
+  saveBackendState(key, value);
+  return value;
+}
+
+export async function syncCache(key, fallback) {
+  const value = await loadBackendState(key, fallback);
   memoryCache[key] = value;
   return value;
 }

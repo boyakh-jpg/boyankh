@@ -4,7 +4,7 @@ import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/dat
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
 import { getDemoUser } from "../data/demoUsers";
-import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, savePointBalance } from "../data/cache";
+import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
 
 function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
@@ -35,28 +35,13 @@ function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
 }
 
 const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.includes(v));
-const loadStoredMap = (key, fallback = {}) => {
-  try {
-    const saved = window.localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-const saveStoredMap = (key, value) => {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
-};
-
 export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all", role, availableRoles, tier = "골드", onSwitchRole, onOpenChat, openModal }) {
   const demoUser = getDemoUser();
-  const cacheKey = name => `toad.${demoUser.id}.${name}`;
   const pointDefault = getDefaultPointBalance(demoUser.role);
   const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
-  const [contacted, setContacted] = useState(() => loadStoredMap(cacheKey("brokerContacted")));
-  const [safeRequests, setSafeRequests] = useState(() => loadStoredMap(cacheKey("brokerSafeRequests")));
-  const [favorites, setFavorites] = useState(() => loadStoredMap(cacheKey("brokerFavorites")));
+  const [contacted, setContacted] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerContacted"));
+  const [safeRequests, setSafeRequests] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerSafeRequests"));
+  const [favorites, setFavorites] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerFavorites"));
   const [defaultMsg, setDefaultMsg] = useState("안녕하세요! 해당 매물 빠른 거래 도와드리겠습니다.");
   const [toast, setToast] = useState("");
   const [chargeOpen, setChargeOpen] = useState(false);
@@ -69,7 +54,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const [dealTypes, setDealTypes] = useState(Array.isArray(preset.dealTypes) ? preset.dealTypes : (preset.dealType && preset.dealType !== "전체" ? [preset.dealType] : []));
   const [sort, setSort] = useState(preset.sort || "최신순");
   const [statusFilter, setStatusFilter] = useState(preset.statusFilter || "거래중만 보기"); // 기본: 거래중인 매물만
-  const [viewed, setViewed] = useState(() => loadStoredMap(cacheKey("brokerViewed")));      // 내가 열람한 매물 기록 {id: timestamp}
+  const [viewed, setViewed] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerViewed"));      // 내가 열람한 매물 기록 {id: timestamp}
   const [notes, setNotes] = useState({});        // 매물별 메모 {id: text}
   const [activeId, setActiveId] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -88,6 +73,22 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
     });
     return () => { alive = false; };
   }, [demoUser.id, pointDefault]);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      loadUserMapState({ userId: demoUser.id, name: "brokerContacted" }),
+      loadUserMapState({ userId: demoUser.id, name: "brokerSafeRequests" }),
+      loadUserMapState({ userId: demoUser.id, name: "brokerFavorites" }),
+      loadUserMapState({ userId: demoUser.id, name: "brokerViewed" }),
+    ]).then(([nextContacted, nextSafeRequests, nextFavorites, nextViewed]) => {
+      if (!alive) return;
+      setContacted(nextContacted);
+      setSafeRequests(nextSafeRequests);
+      setFavorites(nextFavorites);
+      setViewed(nextViewed);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id]);
   const updatePoints = (updater, reason) => setPoints(prev => {
     const next = typeof updater === "function" ? updater(prev) : updater;
     savePointBalance({ userId: demoUser.id, balance: next, delta: next - prev, reason });
@@ -95,7 +96,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   });
   const updateStoredMap = (name, setter, updater) => setter(prev => {
     const next = typeof updater === "function" ? updater(prev) : updater;
-    saveStoredMap(cacheKey(name), next);
+    saveUserMapState({ userId: demoUser.id, name, value: next });
     return next;
   });
   const markViewed = id => updateStoredMap("brokerViewed", setViewed, v => v[id] ? v : ({ ...v, [id]: "방금" }));

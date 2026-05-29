@@ -4,7 +4,7 @@ import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/dat
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Frog, Tag } from "./common";
 import { getDemoUser } from "../data/demoUsers";
-import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, savePointBalance } from "../data/cache";
+import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
 
 
 function MultiFilter({ label, options, values, onToggle, tone = "gold" }) {
@@ -57,9 +57,9 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   const [listMode, setListMode] = useState(menuMode);
   const [filterOpen, setFilterOpen] = useState(menuMode !== "viewed");
   const [appliedFilters, setAppliedFilters] = useState({ regionGroup, region, dong, ptypes, dealTypes, priceMin, priceMax, sort, statusFilter, hideViewed, listMode });
-  const [favorites, setFavorites] = useState({});
-  const [unlocked, setUnlocked] = useState({});
-  const [requests, setRequests] = useState({});
+  const [favorites, setFavorites] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerFavorites"));
+  const [unlocked, setUnlocked] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerUnlocked"));
+  const [requests, setRequests] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerRequests"));
   const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notes, setNotes] = useState({});        // 매물별 메모
@@ -73,12 +73,31 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     });
     return () => { alive = false; };
   }, [demoUser.id, pointDefault]);
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      loadUserMapState({ userId: demoUser.id, name: "buyerFavorites" }),
+      loadUserMapState({ userId: demoUser.id, name: "buyerUnlocked" }),
+      loadUserMapState({ userId: demoUser.id, name: "buyerRequests" }),
+    ]).then(([nextFavorites, nextUnlocked, nextRequests]) => {
+      if (!alive) return;
+      setFavorites(nextFavorites);
+      setUnlocked(nextUnlocked);
+      setRequests(nextRequests);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id]);
   const updatePoints = (updater, reason) => setPoints(prev => {
     const next = typeof updater === "function" ? updater(prev) : updater;
     savePointBalance({ userId: demoUser.id, balance: next, delta: next - prev, reason });
     return next;
   });
-  const toggleFavorite = id => setFavorites(v => ({ ...v, [id]: !v[id] }));
+  const updateStoredMap = (name, setter, updater) => setter(prev => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    saveUserMapState({ userId: demoUser.id, name, value: next });
+    return next;
+  });
+  const toggleFavorite = id => updateStoredMap("buyerFavorites", setFavorites, v => ({ ...v, [id]: !v[id] }));
   const chargeOptions = [10000, 30000, 50000, 100000];
   const buyerBonusRate = amount => amount >= 100000 ? 0.1 : amount >= 50000 ? 0.05 : amount >= 30000 ? 0.03 : 0;
   const matchesPresetRegion = p => region === "전체" ? true : p.region === region;
@@ -213,10 +232,10 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
       return;
     }
     if (p.fast) {
-      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_fast_contact"); setUnlocked(u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처 확인 완료"); } });
+      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_fast_contact"); updateStoredMap("buyerUnlocked", setUnlocked, u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처 확인 완료"); } });
       return;
     }
-    openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_safe_request"); setRequests(r => ({ ...r, [p.id]: "pending" })); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
+    openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_safe_request"); updateStoredMap("buyerRequests", setRequests, r => ({ ...r, [p.id]: "pending" })); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
   };
   useEffect(() => {
     setListMode(menuMode);

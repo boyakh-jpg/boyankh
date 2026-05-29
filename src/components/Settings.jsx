@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { C, G, SH1, SH2 } from "../theme";
 import { REGIONS } from "../data/data";
 import { DEMO_USERS, getDemoUser, saveDemoUser } from "../data/demoUsers";
-import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, savePointBalance } from "../data/cache";
+import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
 import { Frog, RoleToggle, SelectBox, Tag } from "./common";
 
 const NOTIFICATION_LABELS = [
@@ -77,10 +77,14 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
   const [chargeStep, setChargeStep] = useState("summary");
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
-  const [profile, setProfile] = useState({ name: "홍길동", phone: "010-1234-5678", email: "toad@example.com", roleNote: role === "broker" ? "소유주 · 중개사 · 직거래" : "소유주 · 직거래" });
-  const [supportDraft, setSupportDraft] = useState({ title: "", body: "", contact: "010-1234-5678", reportTarget: "", reportBody: "" });
+  const defaultProfile = { name: "홍길동", phone: "010-1234-5678", email: "toad@example.com", roleNote: role === "broker" ? "소유주 · 중개사 · 직거래" : "소유주 · 직거래" };
+  const defaultSupportDraft = { title: "", body: "", contact: "010-1234-5678", reportTarget: "", reportBody: "" };
+  const [profile, setProfile] = useState(() => loadUserMapStateLocal(demoUser.id, "settingsProfile", defaultProfile));
+  const [supportDraft, setSupportDraft] = useState(() => loadUserMapStateLocal(demoUser.id, "supportDraft", defaultSupportDraft));
+  const [notice, setNotice] = useState("");
   const setProfileField = (key, value) => setProfile(p => ({ ...p, [key]: value }));
   const setSupportField = (key, value) => setSupportDraft(p => ({ ...p, [key]: value }));
+  const showNotice = text => { setNotice(text); setTimeout(() => setNotice(""), 1800); };
 
   useEffect(() => {
     pageTopRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -94,6 +98,19 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
     });
     return () => { alive = false; };
   }, [demoUser.id, pointDefault]);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      loadUserMapState({ userId: demoUser.id, name: "settingsProfile", fallback: defaultProfile }),
+      loadUserMapState({ userId: demoUser.id, name: "supportDraft", fallback: defaultSupportDraft }),
+    ]).then(([nextProfile, nextSupportDraft]) => {
+      if (!alive) return;
+      setProfile(nextProfile);
+      setSupportDraft(nextSupportDraft);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id, role]);
 
   const updatePoints = (updater, reason) => setPoints(prev => {
     const next = typeof updater === "function" ? updater(prev) : updater;
@@ -111,6 +128,23 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
     const total = product.amount + product.bonus;
     updatePoints(p => p + total, "settings_point_charge");
     setChargeStep("done");
+  };
+  const saveProfile = () => {
+    saveUserMapState({ userId: demoUser.id, name: "settingsProfile", value: profile });
+    showNotice("프로필 저장 완료");
+  };
+  const saveSupportDraft = next => saveUserMapState({ userId: demoUser.id, name: "supportDraft", value: next });
+  const submitInquiry = () => {
+    const next = { ...supportDraft, submittedAt: new Date().toISOString() };
+    saveSupportDraft(next);
+    saveUserMapState({ userId: demoUser.id, name: "supportLastInquiry", value: next });
+    showNotice("문의 접수 완료");
+  };
+  const submitReport = () => {
+    const next = { ...supportDraft, submittedAt: new Date().toISOString() };
+    saveSupportDraft(next);
+    saveUserMapState({ userId: demoUser.id, name: "supportLastReport", value: next });
+    showNotice("신고 접수 완료");
   };
 
   if (page === "payments" && chargeStep === "checkout") {
@@ -195,12 +229,13 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
     return (
       <div ref={pageTopRef} style={{ padding: 16 }}>
         <BackButton label="계정" onClick={onBack}/>
+        {notice && <div style={{ background: G.greenSoft, color: C.greenInk, borderRadius: 14, padding: "10px 12px", fontSize: 12, fontWeight: 900, marginBottom: 10 }}>{notice}</div>}
         <Section title="프로필 수정">
           <TextInput label="이름" value={profile.name} onChange={value => setProfileField("name", value)} placeholder="이름"/>
           <TextInput label="연락처" value={profile.phone} onChange={value => setProfileField("phone", value)} placeholder="010-0000-0000"/>
           <TextInput label="이메일" value={profile.email} onChange={value => setProfileField("email", value)} placeholder="email@example.com"/>
           <TextInput label="사용 가능 역할" value={profile.roleNote} onChange={value => setProfileField("roleNote", value)} placeholder="소유주 · 직거래"/>
-          <button style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>프로필 저장</button>
+          <button onClick={saveProfile} style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>프로필 저장</button>
         </Section>
         <Section title="백엔드 연결 기준">
           {[["저장 API", "PATCH /me/profile"], ["필드", "name, phone, email, availableRoles"], ["검증", "전화번호 인증, 이메일 중복 확인"]].map(([label, value]) => (
@@ -218,16 +253,17 @@ function AccountSubPage({ page, role, brokerTier, onBack }) {
     return (
       <div ref={pageTopRef} style={{ padding: 16 }}>
         <BackButton label="계정" onClick={onBack}/>
+        {notice && <div style={{ background: G.greenSoft, color: C.greenInk, borderRadius: 14, padding: "10px 12px", fontSize: 12, fontWeight: 900, marginBottom: 10 }}>{notice}</div>}
         <Section title="문의하기">
           <TextInput label="제목" value={supportDraft.title} onChange={value => setSupportField("title", value)} placeholder="문의 제목"/>
           <TextArea label="내용" value={supportDraft.body} onChange={value => setSupportField("body", value)} placeholder="앱 사용, 결제, 매물 노출 문의를 남겨주세요"/>
           <TextInput label="회신 연락처" value={supportDraft.contact} onChange={value => setSupportField("contact", value)} placeholder="연락처"/>
-          <button style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>문의 접수</button>
+          <button onClick={submitInquiry} style={{ width: "100%", border: "none", background: G.header, color: "#fff", borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>문의 접수</button>
         </Section>
         <Section title="신고하기">
           <TextInput label="신고 대상" value={supportDraft.reportTarget} onChange={value => setSupportField("reportTarget", value)} placeholder="매물번호, 채팅방, 사용자"/>
           <TextArea label="신고 사유" value={supportDraft.reportBody} onChange={value => setSupportField("reportBody", value)} placeholder="허위 매물, 부적절한 채팅, 결제 문제 등을 적어주세요"/>
-          <button style={{ width: "100%", border: "none", background: G.gold, color: "#fff", borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>신고 접수</button>
+          <button onClick={submitReport} style={{ width: "100%", border: "none", background: G.gold, color: "#fff", borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>신고 접수</button>
         </Section>
         <Section title="이용약관">
           <div style={{ fontSize: 12, color: C.mid, lineHeight: 1.7 }}>토드는 매물 의뢰, 중개 제안, 직거래 문의를 연결하는 플랫폼이에요. 실제 계약 전 권리관계, 등기, 임대차, 대출, 세금은 사용자가 최종 확인해야 해요.</div>

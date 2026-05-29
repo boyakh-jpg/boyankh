@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FROG_SPRITE } from "../frogSprite";
 import { C, G, SH1, SH2, spring } from "../theme";
 import { INTEREST_BROKERS, DIRECT_BUYERS } from "../data/data";
-import { CACHE_KEYS, loadCache, saveCache } from "../data/cache";
+import { CACHE_KEYS, loadCache, saveCache, syncCache } from "../data/cache";
 import { feeFormula, wonText, estFee, priceChangeRate, isDone, termLabel, isExpiringSoon } from "../utils/helpers";
 
 const SW = 160, SH = 160, COLS = 4, ROWS = 4;
@@ -292,6 +292,13 @@ export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner"
   const [showAll, setShowAll] = useState(false);
   const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
   const decisions = localDecisions && typeof localDecisions === "object" && !Array.isArray(localDecisions) ? localDecisions : {};
+  useEffect(() => {
+    let alive = true;
+    syncCache(CACHE_KEYS.contactDecisions, {}).then(next => {
+      if (alive && next && typeof next === "object" && !Array.isArray(next)) setLocalDecisions(next);
+    });
+    return () => { alive = false; };
+  }, []);
   const decide = (key, value) => {
     if (!key) return;
     setLocalDecisions(d => {
