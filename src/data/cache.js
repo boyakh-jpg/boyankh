@@ -11,6 +11,7 @@ export const CACHE_KEYS = {
   pointLedger: "toad.pointLedger",
   chatMessages: "toad.chatMessages",
   proposalViews: "toad.proposalViews",
+  listingContracts: "toad.listingContracts",
 };
 
 

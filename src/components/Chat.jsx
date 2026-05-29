@@ -4,7 +4,7 @@ import { CHATS } from "../data/data";
 import { CACHE_KEYS, loadCache, saveCache, loadChatContexts, loadChatContextsForUser, syncCache, syncChatContexts } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
-import { isTermExpired } from "../utils/helpers";
+import { isDone, isTermExpired } from "../utils/helpers";
 import { RoleToggle, Frog, Tag } from "./common";
 
 const DEMO_TEST_CHAT = {
@@ -24,7 +24,7 @@ const chatFromContext = (context, role = "buyer") => {
   if (!context?.listing) return null;
   const listing = context.listing;
   const property = `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim();
-  const expired = isTermExpired(listing);
+  const expired = isDone(listing) || isTermExpired(listing);
   const direct = context.mode === "직거래";
   const ownerView = role === "owner";
   const partnerName = ownerView
@@ -115,7 +115,7 @@ const messageFromRow = row => ({
 
 const isNoticeMessage = message =>
   message.senderKey === "toad-demo-system" ||
-  ["채팅 안내", "테스트 안내", "연락처 요청"].includes(message.senderName);
+  ["채팅 안내", "테스트 안내", "연락처 요청", "계약 체결"].includes(message.senderName);
 
 const upsertMessageRow = (messages, row) => {
   const next = messageFromRow(row);
@@ -249,7 +249,7 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   );
 }
 
-export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
+export function ChatRoom({ chatId, chatContext = null, role, listingContracts = {}, onContractListing, onBack }) {
   const demoUser = getDemoUser();
   const storedContext = chatContext?.id === chatId ? chatContext : loadChatContexts().find(context => context.id === chatId);
   const contextChat = storedContext ? chatFromContext(storedContext, role) : null;
@@ -344,7 +344,12 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
 
   const isDirect = chat.mode === "직거래";
   const isFast = chat.mode === "빠른의뢰";
-  const expired = !!chat.expired;
+  const chatListingId = storedContext?.listing?.id || chatContext?.listing?.id || null;
+  const listingContract = chatListingId ? listingContracts[chatListingId] : null;
+  const contractedHere = listingContract?.chatId === chat.id;
+  const contractedElsewhere = !!listingContract && !contractedHere;
+  const expired = !!chat.expired || !!listingContract;
+  const canContractListing = role === "owner" && !chat.demo && !isDirect && !!chatListingId;
   const send = () => {
     if (expired) return;
     const text = input.trim();
@@ -369,6 +374,21 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
       senderKey: "toad-demo-system",
       senderName: "연락처 요청",
       text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐어요. 연락처는 채팅 메시지에 남기지 않아요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
+    });
+  };
+  const contractListing = async () => {
+    if (!canContractListing || contractedHere || contractedElsewhere) return;
+    const nextContract = await onContractListing?.({
+      listingId: chatListingId,
+      chatId: chat.id,
+      partnerName: chat.name,
+      property: chat.property,
+    });
+    if (!nextContract) return;
+    appendMessage({
+      senderKey: "toad-demo-system",
+      senderName: "계약 체결",
+      text: "이 채팅방에서 매물 계약이 체결됐어요. 해당 매물은 완료 처리되어 다른 부동산과 중복 체결할 수 없어요.",
     });
   };
   if (accessDenied) {
@@ -405,6 +425,11 @@ export function ChatRoom({ chatId, chatContext = null, role, onBack }) {
         <div style={{ background: "#ffffff26", borderRadius: 12, padding: "8px 12px", marginTop: 12, fontSize: 12, color: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ opacity: .85 }}>매물</span><span style={{ fontWeight: 600 }}>{chat.property}</span>
         </div>
+        {canContractListing && (
+          <button onClick={contractListing} disabled={contractedHere || contractedElsewhere} style={{ width: "100%", marginTop: 8, border: "none", background: contractedHere ? G.gold : contractedElsewhere ? "#D5DDD7" : "#fff", color: contractedHere ? "#fff" : contractedElsewhere ? C.gray : C.greenInk, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: contractedHere || contractedElsewhere ? "default" : "pointer", fontFamily: "inherit" }}>
+            {contractedHere ? "계약 체결 완료" : contractedElsewhere ? "다른 부동산과 체결된 매물" : "이 매물 계약 체결"}
+          </button>
+        )}
         <div style={{ marginTop: 8, color: "#ffffffd9", fontSize: 11, fontWeight: 800 }}>{demoUser.label}로 대화 중</div>
       </div>
       {profileOpen && (

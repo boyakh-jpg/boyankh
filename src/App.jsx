@@ -15,7 +15,7 @@ import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { DEMO_USERS, getDemoUser } from "./data/demoUsers";
-import { loadBackendState, loadLocalState, saveBackendState, saveChatContext } from "./data/cache";
+import { CACHE_KEYS, loadBackendState, loadCache, loadLocalState, saveBackendState, saveCache, saveChatContext, syncCache } from "./data/cache";
 import { loadDemoEnvironment } from "./data/supabaseData";
 
 const loadSetting = (key, fallback) => {
@@ -35,6 +35,17 @@ const saveSetting = (key, value) => {
   } catch {}
   saveBackendState(key, value);
 };
+const listingContractKey = listing => String(listing?.id || listing?.demoListingId || listing?.demo_listing_id || "");
+const contractedListingPatch = listing => ({
+  status: "done",
+  completedDaysAgo: 0,
+  expiresInDays: 0,
+  doneLabel: listing?.dealType === "전세" ? "전세완료" : listing?.dealType === "월세" || listing?.dealType === "임대" ? "임대완료" : "매도완료",
+});
+const applyListingContracts = (list, contracts = {}) => list.map(listing => {
+  const key = listingContractKey(listing);
+  return key && contracts[key] ? { ...listing, ...contractedListingPatch(listing) } : listing;
+});
 const roleAccessFor = (demoRole, accountType) => {
   if (demoRole === "broker" || accountType === "broker") return ["broker", "owner"];
   if (demoRole === "buyer") return ["buyer", "owner"];
@@ -199,6 +210,10 @@ export default function App() {
   const [brokerOffices, setBrokerOffices] = useState(BROKER_OFFICES);
   const [brokerProposals, setBrokerProposals] = useState([]);
   const [directBuyerProposals, setDirectBuyerProposals] = useState([]);
+  const [listingContracts, setListingContracts] = useState(() => {
+    const cached = loadCache(CACHE_KEYS.listingContracts, {});
+    return cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {};
+  });
   const contentRef = useRef(null);
   useEffect(() => {
     let alive = true;
@@ -237,6 +252,15 @@ export default function App() {
   // ===== 공용 매물 store (owner/broker/buyer가 같은 데이터를 봄) =====
   const [properties, setProperties] = useState([]);
   useEffect(() => {
+    let alive = true;
+    syncCache(CACHE_KEYS.listingContracts, {}).then(next => {
+      if (!alive || !next || typeof next !== "object" || Array.isArray(next)) return;
+      setListingContracts(next);
+      setProperties(prev => applyListingContracts(prev, next));
+    });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
     async function loadListings() {
       const { data, error } = await supabase
         .from("listings")
@@ -248,7 +272,7 @@ export default function App() {
       }
 
       if (Array.isArray(data) && data.length > 0) {
-        setProperties(data.map(row => normalizeListing(row, demoUser.id)));
+        setProperties(applyListingContracts(data.map(row => normalizeListing(row, demoUser.id)), loadCache(CACHE_KEYS.listingContracts, {})));
       }
     }
 
@@ -397,6 +421,37 @@ export default function App() {
     buyerKey: demoUser.id,
     buyerName: demoUser.label,
   });
+  const contractListingFromChat = async ({ listingId, chatId, partnerName, property }) => {
+    const key = String(listingId || "");
+    if (!key) return null;
+    const current = loadCache(CACHE_KEYS.listingContracts, {});
+    const base = current && typeof current === "object" && !Array.isArray(current) ? current : {};
+    if (base[key] && base[key].chatId !== chatId) return base[key];
+    const contract = {
+      listingId: key,
+      chatId,
+      partnerName,
+      property,
+      contractedAt: new Date().toISOString(),
+    };
+    const next = { ...base, [key]: contract };
+    setListingContracts(next);
+    saveCache(CACHE_KEYS.listingContracts, next);
+    setProperties(prev => applyListingContracts(prev, next));
+
+    const listing = properties.find(item => listingContractKey(item) === key);
+    if (listing) {
+      const patch = contractedListingPatch(listing);
+      supabase
+        .from("listings")
+        .update(listingPatchToRow(patch))
+        .eq("id", listing.id)
+        .then(({ error }) => {
+          if (error) console.error("Supabase contract listing update error:", error);
+        });
+    }
+    return contract;
+  };
   const applyDemoUser = user => {
     setDemoUser(user);
     setRole(user.role);
@@ -461,7 +516,7 @@ export default function App() {
           {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
           {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onOpenDemoChat={() => openChat("demo-test-chat")} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} onBack={() => setScreen("chatlist")}/>}
+          {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} listingContracts={listingContracts} onContractListing={contractListingFromChat} onBack={() => setScreen("chatlist")}/>}
           {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}
           {screen === "profile" && role !== "broker" && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: G.pageBg }}>

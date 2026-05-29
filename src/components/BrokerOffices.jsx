@@ -10,7 +10,7 @@ const responseModeLabel = {
   none: "응답 안 함",
 };
 
-export function OfficeDetail({ office, contracted, onContract, onClose }) {
+export function OfficeDetail({ office, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "84%", overflowY: "auto", background: G.pageBg, borderRadius: "26px 26px 0 0", padding: "20px 18px 72px", boxSizing: "border-box", animation: "sheetUp .3s" }}>
@@ -20,7 +20,6 @@ export function OfficeDetail({ office, contracted, onContract, onClose }) {
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 5 }}>
               <Tag>{office.tier}</Tag>
-              {contracted && <Tag tone="gold">계약 체결됨</Tag>}
             </div>
             <div style={{ fontSize: 19, fontWeight: 900, color: C.dark }}>{office.officeName}</div>
             <div style={{ fontSize: 12, color: C.gray }}>{office.agentName} 공인중개사 · {responseModeLabel[office.responseMode]}</div>
@@ -68,7 +67,7 @@ export function OfficeDetail({ office, contracted, onContract, onClose }) {
             </div>
           ))}
         </div>
-        <button onClick={() => onContract(office.id)} disabled={contracted} style={{ width: "100%", padding: "14px 0", background: contracted ? "#D5DDD7" : G.header, border: "none", borderRadius: 15, color: "#fff", fontSize: 14, fontWeight: 900, cursor: contracted ? "default" : "pointer", fontFamily: "inherit", marginBottom: 8 }}>{contracted ? "계약 체결됨" : "이 부동산과 계약 체결"}</button>
+        <div style={{ background: G.goldSoft, borderRadius: 15, padding: "13px 14px", color: C.goldInk, fontSize: 12, fontWeight: 900, lineHeight: 1.5, marginBottom: 8 }}>계약 체결은 매물별 채팅방에서만 진행해요.</div>
         <button style={{ width: "100%", padding: "13px 0", background: "#fff", border: `1.5px solid ${C.green}`, borderRadius: 15, color: C.greenInk, fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>채팅하기</button>
       </div>
     </div>
@@ -83,7 +82,6 @@ export function BrokerOffices({ offices = BROKER_OFFICES, role = "owner", availa
   const [region, setRegion] = useState("전체");
   const [dong, setDong] = useState("전체");
   const [selected, setSelected] = useState(null);
-  const [contractedId, setContractedId] = useState(null);
   const officeDong = o => (o.address.split(" ")[2] || "").trim();
   const matchesRegion = o => region === "전체" ? (!regionGroup.length || o.specialtyRegions.some(r => regionGroup.includes(r))) : o.specialtyRegions.includes(region);
   const tierScore = o => {
@@ -103,8 +101,6 @@ export function BrokerOffices({ offices = BROKER_OFFICES, role = "owner", availa
       {selectedOffice && (
         <OfficeDetail
           office={selectedOffice}
-          contracted={contractedId === selectedOffice.id}
-          onContract={setContractedId}
           onClose={() => setSelected(null)}
         />
       )}
