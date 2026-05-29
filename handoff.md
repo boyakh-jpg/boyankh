@@ -3,16 +3,17 @@
 ## 목적
 
 이 파일은 `toad` 작업 시작용 인수인계 진입점이다.
-긴 누적 기록은 `handoff.storage.md`, 현재 작업 상태와 정리 대기 항목은 `handoff.cache.md`를 본다.
+긴 누적 기록은 `handoff.storage.md`, 현재 작업 상태와 정리 대기 항목은 `handoff.cache.md`, 파일 지도는 `handoff.map.md`를 본다.
 
 ## 반드시 읽는 순서
 
 1. `AGENTS.md`
 2. `handoff.md`
 3. `handoff.cache.md`
-4. `src/App.jsx`
-5. 최근 수정 파일
-6. 필요할 때만 `handoff.storage.md`
+4. `handoff.map.md`
+5. 작업별 대상 파일
+6. 최근 수정 파일
+7. 필요할 때만 `handoff.storage.md`
 
 ## 작업 기준
 
@@ -28,6 +29,7 @@
 
 - `handoff.md`: 시작 절차, 읽는 순서, 작업 규칙.
 - `handoff.cache.md`: 현재 변경 상태, 다음 작업, 저장장치로 옮길 항목.
+- `handoff.map.md`: 파일별 역할, 작업별 우선 읽기 경로.
 - `handoff.storage.md`: 확정된 누적 기록, 백엔드 교체 기준, 과거 결정.
 
 ## 문서 갱신 규칙
@@ -36,18 +38,12 @@
 - 작업이 검증/푸시되면 확정 내용만 `handoff.storage.md`에 옮긴다.
 - `handoff.cache.md`에는 `storage 반영 후 지울 항목`을 같이 적는다.
 - 오래된 세부 로그는 `handoff.md`에 쓰지 않는다.
+- 긴 파일은 `handoff.map.md`에서 대상 파일을 고른 뒤 필요한 부분만 검색해서 읽는다.
 
 ## 현재 확인할 파일
 
-- `src/App.jsx`
-- `src/components/Broker.jsx`
-- `src/components/BuyerExplore.jsx`
-- `src/components/Chat.jsx`
-- `src/components/Settings.jsx`
-- `src/components/common.jsx`
-- `src/data/cache.js`
-- `src/data/data.js`
-- `src/utils/helpers.js`
+- 먼저 `handoff.map.md`에서 작업별 대상 파일을 고른다.
+- 공통 기본 파일: `src/App.jsx`, `src/data/cache.js`, `src/utils/helpers.js`
 
 ## 핵심 주의
 
