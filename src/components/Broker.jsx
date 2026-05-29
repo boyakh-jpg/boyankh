@@ -4,7 +4,7 @@ import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/dat
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
 import { getDemoUser } from "../data/demoUsers";
-import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
+import { CACHE_KEYS, getDefaultPointBalance, loadCache, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState, syncCache } from "../data/cache";
 
 function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
@@ -42,6 +42,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const [contacted, setContacted] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerContacted"));
   const [safeRequests, setSafeRequests] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerSafeRequests"));
   const [favorites, setFavorites] = useState(() => loadUserMapStateLocal(demoUser.id, "brokerFavorites"));
+  const [contactDecisions, setContactDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
   const [defaultMsg, setDefaultMsg] = useState("안녕하세요! 해당 매물 빠른 거래 도와드리겠습니다.");
   const [toast, setToast] = useState("");
   const [chargeOpen, setChargeOpen] = useState(false);
@@ -80,12 +81,16 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
       loadUserMapState({ userId: demoUser.id, name: "brokerSafeRequests" }),
       loadUserMapState({ userId: demoUser.id, name: "brokerFavorites" }),
       loadUserMapState({ userId: demoUser.id, name: "brokerViewed" }),
-    ]).then(([nextContacted, nextSafeRequests, nextFavorites, nextViewed]) => {
+      syncCache(CACHE_KEYS.contactDecisions, {}),
+    ]).then(([nextContacted, nextSafeRequests, nextFavorites, nextViewed, nextContactDecisions]) => {
       if (!alive) return;
       setContacted(nextContacted);
       setSafeRequests(nextSafeRequests);
       setFavorites(nextFavorites);
       setViewed(nextViewed);
+      if (nextContactDecisions && typeof nextContactDecisions === "object" && !Array.isArray(nextContactDecisions)) {
+        setContactDecisions(nextContactDecisions);
+      }
     });
     return () => { alive = false; };
   }, [demoUser.id]);
@@ -102,6 +107,9 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const markViewed = id => updateStoredMap("brokerViewed", setViewed, v => v[id] ? v : ({ ...v, [id]: "방금" }));
   const markContacted = id => updateStoredMap("brokerContacted", setContacted, c => ({ ...c, [id]: true }));
   const markSafeRequest = (id, status) => updateStoredMap("brokerSafeRequests", setSafeRequests, r => ({ ...r, [id]: status }));
+  const safeDecisionKey = listing => `listing-${listing.id}-${demoUser.id}`;
+  const safeApproved = listing => contactDecisions?.[safeDecisionKey(listing)] === "approved";
+  const contactOpen = listing => listing.fast ? !!contacted[listing.id] : safeApproved(listing);
   const toggleFavorite = id => updateStoredMap("brokerFavorites", setFavorites, v => ({ ...v, [id]: !v[id] }));
   const matchesPresetRegion = p => region === "전체" ? true : p.region === region;
   const matchesAppliedRegion = p => appliedFilters.region === "전체" ? true : p.region === appliedFilters.region;
@@ -225,7 +233,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
     return Number(l.tenantMonthly) > 0 ? `${deposit}/${Number(l.tenantMonthly).toLocaleString()}만` : deposit;
   };
   const leaseBadge = l => l.dealType === "매매" && l.tenant === "있어요" ? (Number(l.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
-  const ownerPhoneFor = l => l.ownerPhone || l.owner_phone || "010-2300-3891";
+  const ownerPhoneFor = l => l.ownerPhone || l.owner_phone || "연락처 미등록";
   const ownerLabelFor = l => l.ownerLabel || l.ownerName || (String(l.ownerKey || "").startsWith("owner-") ? `소유주 ${String(l.ownerKey).replace("owner-", "")}` : l.ownerKey) || "소유주 미지정";
   const ContactOpenBox = ({ listing }) => (
     <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
@@ -308,7 +316,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>거래 완료된 매물</div>
           ) : expired ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
-          ) : contacted[listing.id] && listing.fast ? (
+          ) : contactOpen(listing) ? (
             <ContactOpenBox listing={listing}/>
           ) : contacted[listing.id] ? (
             <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 확인 완료 · 채팅하기" : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
@@ -336,7 +344,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
             <span style={{ fontSize: 11, color: C.gray }}>{updateLabel(l)}</span>
             {done ? <DoneBadge label={l.doneLabel}/> : (l.badge && <Tag tone={l.badge==="NEW"?"green":"gold"}>{l.badge}</Tag>)}
             {badge && <Tag tone="gold">{badge}</Tag>}
-            {!done && contacted[l.id] && <ContactBadge label={safeRequests[l.id] === "pending" ? "승인 대기" : "연락함"} tone={l.fast ? "gold" : "green"}/>}
+            {!done && (contacted[l.id] || contactOpen(l)) && <ContactBadge label={contactOpen(l) ? "연락처 공개" : "승인 대기"} tone={l.fast ? "gold" : "green"}/>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <button onClick={(e) => { e.stopPropagation(); toggleFavorite(l.id); }} style={{ width: 28, height: 28, borderRadius: 14, border: `1px solid ${favorite ? C.gold : C.line}`, background: favorite ? G.goldSoft : "#fff", color: favorite ? C.goldInk : C.gray, fontSize: 15, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}>{favorite ? "★" : "☆"}</button>
@@ -359,7 +367,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
           </div>
         ) : expired ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "11px 14px", textAlign: "center", color: "#7B8580", fontWeight: 700, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
-        ) : contacted[l.id] && l.fast ? (
+        ) : contactOpen(l) ? (
           <ContactOpenBox listing={l}/>
         ) : contacted[l.id] ? (
           <div onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(l); }} style={{ background: G.greenSoft, borderRadius: 12, padding: "12px 0", textAlign: "center", color: C.greenInk, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{l.fast ? "연락처 확인 완료 · 채팅하기" : "채팅방 열기 · 승인 대기 중"}</div>

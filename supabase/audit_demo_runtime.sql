@@ -126,6 +126,7 @@ select 'null_required_checks', jsonb_build_object(
   'broker_offices_missing_name', (select count(*) from public.broker_offices where coalesce(office_name, '') = '' or coalesce(agent_name, '') = ''),
   'listings_missing_owner_key', (select count(*) from public.listings where owner_key is null),
   'listings_missing_demo_listing_id', (select count(*) from public.listings where owner_key like 'owner-%' and demo_listing_id is null),
+  'listings_missing_owner_phone', (select count(*) from public.listings where owner_key like 'owner-%' and coalesce(owner_phone, '') = ''),
   'listings_missing_title', (select count(*) from public.listings where owner_key like 'owner-%' and coalesce(title, complex, '') = ''),
   'chat_messages_missing_body', (select count(*) from public.chat_messages where coalesce(body, '') = '')
 )
@@ -227,6 +228,7 @@ union all
 select 'sample_owner_001_listings', coalesce(jsonb_agg(jsonb_build_object(
   'demo_listing_id', demo_listing_id,
   'owner_key', owner_key,
+  'owner_phone', owner_phone,
   'title', title,
   'status', status,
   'fast', fast

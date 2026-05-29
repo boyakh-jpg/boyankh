@@ -217,6 +217,7 @@ const safeListingForChat = listing => ({
   demoListingId: listing.demoListingId || listing.demo_listing_id || null,
   ownerKey: listing.ownerKey || listing.owner_key || null,
   ownerLabel: listing.ownerLabel || listing.ownerName || null,
+  ownerPhone: listing.ownerPhone || listing.owner_phone || null,
   region: listing.region,
   dong: listing.dong,
   complex: listing.complex,

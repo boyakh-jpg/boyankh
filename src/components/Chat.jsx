@@ -85,6 +85,7 @@ const chatFromContext = (context, role = "buyer") => {
     expired,
     ownerKey,
     ownerLabel,
+    ownerPhone: listing.ownerPhone || listing.owner_phone || null,
     buyerKey: context.buyerKey || null,
     brokerKey: context.brokerKey || null,
     contactRequestId: context.contactRequestId || context.id,
@@ -402,6 +403,9 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
   const needsContactApproval = !expired && !chat.demo && !isFast;
   const canApproveContact = role === "owner";
   const contactDecision = localContactDecision;
+  const ownerPhone = storedContext?.listing?.ownerPhone || storedContext?.listing?.owner_phone || chat.ownerPhone || null;
+  const contactApproved = contactDecision === "approved";
+  const canSeeOwnerPhone = !expired && role !== "owner" && (isFast || contactApproved) && !!ownerPhone;
   const decideContact = approved => {
     const nextDecision = approved ? "approved" : "rejected";
     setLocalContactDecision(nextDecision);
@@ -413,7 +417,7 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
     appendMessage({
       senderKey: "toad-demo-system",
       senderName: "연락처 요청",
-      text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐어요. 연락처는 채팅 메시지에 남기지 않아요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
+      text: approved ? "연락처 공개가 승인됐어요. 차감된 포인트가 사용 확정됐고 상단에 연락처가 공개돼요." : "연락처 공개 요청이 거절됐어요. 차감된 포인트는 자동 환불돼요.",
     });
   };
   const contractListing = async () => {
@@ -466,6 +470,12 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ opacity: .85 }}>매물</span><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.property}</span></div>
           {chat.ownerLabel && role !== "owner" && <div style={{ color: "#ffffffd9", fontWeight: 800 }}>{chat.ownerLabel}</div>}
         </div>
+        {canSeeOwnerPhone && (
+          <div style={{ background: "#fff", color: C.dark, borderRadius: 12, padding: "9px 12px", marginTop: 8, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", boxShadow: SH2 }}>
+            <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 900 }}>소유주 연락처</span>
+            <span style={{ fontSize: 14, fontWeight: 900 }}>{ownerPhone}</span>
+          </div>
+        )}
         {canContractListing && (
           <button onClick={contractListing} disabled={contractedHere || contractedElsewhere} style={{ width: "100%", marginTop: 8, border: "none", background: contractedHere ? G.gold : contractedElsewhere ? "#D5DDD7" : "#fff", color: contractedHere ? "#fff" : contractedElsewhere ? C.gray : C.greenInk, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: contractedHere || contractedElsewhere ? "default" : "pointer", fontFamily: "inherit" }}>
             {contractedHere ? "계약 체결 완료" : contractedElsewhere ? "다른 부동산과 체결된 매물" : "이 매물 계약 체결"}
@@ -501,7 +511,7 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
         {needsContactApproval && <div style={{ background: contactDecision === "approved" ? G.greenSoft : contactDecision === "rejected" ? "#F2F4F3" : G.goldSoft, border: `1px solid ${contactDecision === "approved" ? C.green : contactDecision === "rejected" ? C.line : C.gold}`, borderRadius: 16, padding: 14, alignSelf: "stretch", boxShadow: SH2 }}>
           <div style={{ fontSize: 13, fontWeight: 900, color: contactDecision === "approved" ? C.greenInk : contactDecision === "rejected" ? C.gray : C.goldInk, marginBottom: 5 }}>연락처 공개 요청</div>
           <div style={{ fontSize: 12, color: C.mid, lineHeight: 1.6 }}>
-            {contactDecision === "approved" ? "연락처 공개가 승인됐어요. 연락처는 채팅 메시지에 남기지 않아요." : contactDecision === "rejected" ? "요청을 거절했어요. 신청자 포인트는 자동 환불돼요." : canApproveContact ? "상대가 연락처 공개를 요청했어요. 공개하면 포인트 사용 확정, 거절하면 자동 환불돼요." : "소유주 승인 대기 중이에요. 거절되거나 24시간 안에 응답이 없으면 자동 환불돼요."}
+            {contactDecision === "approved" ? "연락처 공개가 승인됐어요. 위 연락처를 확인하세요." : contactDecision === "rejected" ? "요청을 거절했어요. 신청자 포인트는 자동 환불돼요." : canApproveContact ? "상대가 연락처 공개를 요청했어요. 공개하면 포인트 사용 확정, 거절하면 자동 환불돼요." : "소유주 승인 대기 중이에요. 거절되거나 24시간 안에 응답이 없으면 자동 환불돼요."}
           </div>
           {!contactDecision && canApproveContact && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>

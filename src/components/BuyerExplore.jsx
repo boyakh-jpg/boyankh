@@ -211,7 +211,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
     return Number(p.tenantMonthly) > 0 ? `${deposit}/${Number(p.tenantMonthly).toLocaleString()}만` : deposit;
   };
   const leaseBadge = p => p.dealType === "매매" && p.tenant === "있어요" ? (Number(p.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
-  const ownerPhoneFor = p => p.ownerPhone || p.owner_phone || "010-2300-3891";
+  const ownerPhoneFor = p => p.ownerPhone || p.owner_phone || "연락처 미등록";
   const ownerLabelFor = p => p.ownerLabel || p.ownerName || (String(p.ownerKey || "").startsWith("owner-") ? `소유주 ${String(p.ownerKey).replace("owner-", "")}` : p.ownerKey) || "소유주 미지정";
   const ContactOpenBox = ({ listing }) => (
     <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
