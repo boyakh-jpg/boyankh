@@ -1,9 +1,11 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { C, G, SH1 } from "../theme";
-import { Frog, RoleToggle, StatCard, ListSheet, BrokerOfficeCard, FeeEstimate, PriceTrend, PriceHistoryPanel, DoneBadge, Tag } from "./common";
-import { PROPERTIES, BROKER_OFFICES, DIRECT_BUYERS, INTEREST_BROKERS, OWNER_DEMO_ACTIVE_COUNT } from "../data/data";
+import { useEffect } from "react";
+import { Frog, RoleToggle, StatCard, ListSheet, BrokerOfficeCard, FeeEstimate, PriceTrend, PriceHistoryPanel, DoneBadge, Tag, getNewProposalItems, getOwnerProposalItems } from "./common";
+import { OfficeDetail } from "./BrokerOffices";
 import { estFee, isDone, isExpiringSoon, isNewListing, priceChangeRate, termLabel } from "../utils/helpers";
 import { getDemoUser } from "../data/demoUsers";
+import { CACHE_KEYS, loadCache, saveCache, syncCache } from "../data/cache";
 
 function Header({ role, availableRoles, title, subtitle, mood, onSwitchRole, actionLabel, onAction }) {
   return (
@@ -49,15 +51,29 @@ function SectionTitle({ title, actionLabel, actionColor = C.greenInk, onAction }
   );
 }
 
-function TaskList({ items }) {
-  const [checked, setChecked] = useState({});
+function TaskList({ items, cacheKey = "toad.todayTasks" }) {
+  const [checked, setChecked] = useState(() => loadCache(cacheKey, {}));
+  useEffect(() => {
+    let alive = true;
+    syncCache(cacheKey, {}).then(next => {
+      if (alive && next && typeof next === "object" && !Array.isArray(next)) setChecked(next);
+    });
+    return () => { alive = false; };
+  }, [cacheKey]);
+  const markDone = title => {
+    setChecked(current => {
+      const next = { ...(current && typeof current === "object" && !Array.isArray(current) ? current : {}), [title]: true };
+      saveCache(cacheKey, next);
+      return next;
+    });
+  };
   return (
     <div style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: SH1 }}>
       <div style={{ fontSize: 15, fontWeight: 900, color: C.dark, marginBottom: 12 }}>오늘 확인할 일</div>
       {items.map(([title, sub, action]) => {
         const done = !!checked[title];
         return (
-        <button key={title} onClick={() => { setChecked(c => ({ ...c, [title]: true })); action && action(); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: done ? G.greenSoft : "#fff", border: `1.5px solid ${done ? C.green : C.line}`, borderRadius: 14, padding: "12px 13px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+        <button key={title} onClick={() => { markDone(title); action && action(); }} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: done ? G.greenSoft : "#fff", border: `1.5px solid ${done ? C.green : C.line}`, borderRadius: 14, padding: "12px 13px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
           <span style={{ display: "flex", gap: 9, alignItems: "center", minWidth: 0 }}>
             {done && <span style={{ width: 20, height: 20, borderRadius: 10, background: G.header, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, flexShrink: 0 }}>✓</span>}
             <span style={{ minWidth: 0 }}>
@@ -72,6 +88,11 @@ function TaskList({ items }) {
     </div>
   );
 }
+
+const localDateKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 function ListingCard({ listing, tone = "green", onClick, showFee = false }) {
   return (
@@ -129,10 +150,30 @@ function HomeDetailSheet({ listing, tone = "green", onClose }) {
   );
 }
 
-export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerList, onSubscription, role, availableRoles, onSwitchRole, brokerTier = "골드", preferredRegion = "강남구", interestRegion = "마포구", properties = PROPERTIES }) {
+export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerList, onSubscription, role, availableRoles, onSwitchRole, brokerTier = "골드", preferredRegion = "강남구", interestRegion = "마포구", properties = [], demoUser = getDemoUser(), brokerOffices = [], brokerProposals = null, directBuyerProposals = null }) {
   const [sheet, setSheet] = useState(null);
   const [detail, setDetail] = useState(null);
-  const demoUser = getDemoUser();
+  const [officeDetail, setOfficeDetail] = useState(null);
+  const [contractedOfficeId, setContractedOfficeId] = useState(null);
+  const [proposalDecisions, setProposalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
+  const [proposalViews, setProposalViews] = useState(() => loadCache(CACHE_KEYS.proposalViews, {}));
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      syncCache(CACHE_KEYS.contactDecisions, {}),
+      syncCache(CACHE_KEYS.proposalViews, {}),
+    ]).then(([nextDecisions, nextViews]) => {
+      if (!alive) return;
+      if (nextDecisions && typeof nextDecisions === "object" && !Array.isArray(nextDecisions)) setProposalDecisions(nextDecisions);
+      if (nextViews && typeof nextViews === "object" && !Array.isArray(nextViews)) setProposalViews(nextViews);
+    });
+    return () => { alive = false; };
+  }, [demoUser.id]);
+  const updateProposalState = next => {
+    if (next?.decisions) setProposalDecisions(next.decisions);
+    if (next?.views) setProposalViews(next.views);
+  };
+  const todayTaskKey = `toad.${demoUser.id}.${role}.todayTasks.${localDateKey()}`;
   const targetRegions = Array.from(new Set([preferredRegion, interestRegion].filter(Boolean)));
   const officeTierScore = office => {
     const tier = office.tier || "";
@@ -152,21 +193,27 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   const priceDownCount = recommendedListings.filter(p => priceChangeRate(p) < -0.1).length;
   const brokerBonus = { 무료: 0, 실버: 5, 골드: 10 }[brokerTier] || 0;
   const ownerListings = properties.filter(p => p.mine);
-  const newBrokerProposals = INTEREST_BROKERS.filter(b => b.proposalNew);
-  const newDirectBuyers = DIRECT_BUYERS.filter(b => b.proposalNew);
-  const ownerProposalCounts = demoUser.id === "toad-demo-owner-2"
-    ? { brokers: 2, direct: 1, newBrokers: 1, newDirect: 1, expiring: 0 }
-    : { brokers: INTEREST_BROKERS.length, direct: DIRECT_BUYERS.length, newBrokers: newBrokerProposals.length, newDirect: newDirectBuyers.length, expiring: 1 };
-  const ownerFallbackSummary = demoUser.id === "toad-demo-owner-2" ? [
-    { id: "home-owner-b-1", region: "강남구", dong: "대치동", complex: "은마아파트", propType: "아파트", dealType: "매매", price: "17억 8,000만", priceNum: 178000, area: 76, floor: 9, fee: "0.4%", fast: false, views: 18, status: "active", expiresInDays: 5, priceHistory: [] },
-    { id: "home-owner-b-2", region: "강남구", dong: "역삼동", complex: "강남역 센트럴", propType: "오피스텔", dealType: "월세", price: "1,000/95만", priceNum: 1000, area: 29, floor: 12, fee: "0.4%", fast: true, views: 32, status: "active", expiresInDays: 9, priceHistory: [] },
-  ] : properties.slice(8, 10);
+  const ownerProposalItemsFor = (items, kind) => {
+    const fallback = getOwnerProposalItems(demoUser.id, kind);
+    const source = Array.isArray(items) ? items : fallback;
+    return source.filter(item => !item.ownerKey || item.ownerKey === demoUser.id);
+  };
+  const ownerBrokerProposalItems = ownerProposalItemsFor(brokerProposals, "broker");
+  const ownerDirectProposalItems = ownerProposalItemsFor(directBuyerProposals, "direct");
+  const ownerProposalCounts = {
+    brokers: ownerBrokerProposalItems.length,
+    direct: ownerDirectProposalItems.length,
+    newBrokers: getNewProposalItems(ownerBrokerProposalItems, proposalDecisions, proposalViews).length,
+    newDirect: getNewProposalItems(ownerDirectProposalItems, proposalDecisions, proposalViews).length,
+  };
+  const ownerFallbackSummary = [];
   const ownerSummary = (ownerListings.length ? ownerListings : ownerFallbackSummary).slice(0, 2);
-  const ownerActiveCount = OWNER_DEMO_ACTIVE_COUNT + ownerListings.filter(p => !isDone(p)).length;
-  const ownerExpiringCount = ownerProposalCounts.expiring + ownerListings.filter(p => !isDone(p) && isExpiringSoon(p)).length;
-  const localOffices = BROKER_OFFICES.filter(b => b.specialtyRegions?.some(r => targetRegions.includes(r)));
+  const ownerActiveCount = ownerListings.filter(p => !isDone(p)).length;
+  const ownerExpiringCount = ownerListings.filter(p => !isDone(p) && isExpiringSoon(p)).length;
+  const officeSource = brokerOffices;
+  const localOffices = officeSource.filter(b => b.specialtyRegions?.some(r => targetRegions.includes(r)));
   const topLocalOffices = localOffices.filter(b => (b.percentileInRegion || 100) <= 30);
-  const officePool = topLocalOffices.length ? topLocalOffices : (localOffices.length ? localOffices : BROKER_OFFICES);
+  const officePool = topLocalOffices.length ? topLocalOffices : (localOffices.length ? localOffices : officeSource);
   const ownerOffices = [...officePool].sort((a, b) => officeTierScore(b) - officeTierScore(a));
   const brokerScore = p => estFee(p) / 10000 + (p.views || 0) * 10;
   const buyerScore = p => Math.max(0, -priceChangeRate(p)) * 100 + (p.views || 0) * 5;
@@ -180,14 +227,14 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   const brokerInterestSummary = hasInterestSection ? rankedListings(interestRegion, brokerScore) : [];
   const buyerBaseSummary = rankedListings(preferredRegion, buyerScore);
   const buyerInterestSummary = hasInterestSection ? rankedListings(interestRegion, buyerScore) : [];
-  const officesByRegion = region => BROKER_OFFICES.filter(b => b.specialtyRegions?.includes(region)).sort((a, b) => officeTierScore(b) - officeTierScore(a)).slice(0, 2);
+  const officesByRegion = region => officeSource.filter(b => b.specialtyRegions?.includes(region)).sort((a, b) => officeTierScore(b) - officeTierScore(a)).slice(0, 2);
   const baseOffices = officesByRegion(preferredRegion);
   const interestOffices = hasInterestSection ? officesByRegion(interestRegion) : [];
 
   if (role === "broker") {
     return (
       <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>}
+        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>} 
         <Header role={role} availableRoles={availableRoles} title="공인중개사 홈" subtitle="중개 매물이 있어요" mood="smug" onSwitchRole={onSwitchRole} actionLabel="매물 보기" onAction={() => onBrokerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -196,9 +243,9 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
             <StatCard value={newCount + "건"} label="3일 신규매물" tone="gold" onClick={() => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
           </div>
           <BrokerPlanIntro tier={brokerTier} bonus={brokerBonus} onClick={onSubscription}/>
-          <TaskList items={[
-            ["수수료 높은 매물", `${baseLabel} 예상 중개보수 기준으로 우선 확인`, () => onBrokerList({ ...localPreset, sort: "수수료높은순" })],
-            ["신규 의뢰", `${baseLabel} 최근 3일 안에 올라온 의뢰`, () => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
+          <TaskList cacheKey={todayTaskKey} items={[
+            ["수수료 높은 매물", `${baseLabel} 예상 중개보수 상위 ${baseListings.length}건`, () => onBrokerList({ ...localPreset, sort: "수수료높은순" })],
+            ["신규 의뢰", `${baseLabel} 최근 3일 신규 ${newCount}건`, () => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
             ["만료 임박", `${baseLabel} ${expiringCount}건은 빠르게 제안해야 해요`, () => onBrokerList({ ...localPreset, statusFilter: "만료 임박" })],
           ]}/>
           <SectionTitle title="기본지역 추천 매물" actionLabel="기본지역 매물로 이동" onAction={() => onBrokerList({ region: preferredRegion })}/>
@@ -216,7 +263,7 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
   if (role === "buyer") {
     return (
       <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>}
+        {detail && <HomeDetailSheet listing={detail.listing} tone={detail.tone} onClose={() => setDetail(null)}/>} 
         <Header role={role} availableRoles={availableRoles} title="직거래 홈" subtitle="쉽게 집을 찾아요" mood="cool" onSwitchRole={onSwitchRole} actionLabel="직거래 매물 보기" onAction={() => onBuyerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -224,10 +271,10 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
             <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="gold" onClick={() => onBuyerList({ region: interestRegion })}/>
             <StatCard value={newCount + "건"} label="3일 신규매물" tone="green" onClick={() => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
           </div>
-          <TaskList items={[
-            ["신규 매물", `${baseLabel} 최근 3일 안에 올라온 매물`, () => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
+          <TaskList cacheKey={todayTaskKey} items={[
+            ["신규 매물", `${baseLabel} 최근 3일 신규 ${newCount}건`, () => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
             ["가격 인하 매물", `${baseLabel} ${priceDownCount}건은 가격이 내려갔어요`, () => onBuyerList({ ...localPreset, sort: "추이 하락순" })],
-            ["인기 매물", `${baseLabel} 열람이 많은 직거래 매물`, () => onBuyerList({ ...localPreset, sort: "인기순" })],
+            ["인기 매물", `${baseLabel} 열람 많은 매물 ${recommendedListings.length}건`, () => onBuyerList({ ...localPreset, sort: "인기순" })],
           ]}/>
           <SectionTitle title="기본지역 추천 매물" actionLabel="기본지역 매물로 이동" actionColor={C.goldInk} onAction={() => onBuyerList({ region: preferredRegion })}/>
           {buyerBaseSummary.map(l => <ListingCard key={l.id} listing={l} tone="gold" onClick={() => setDetail({ listing: l, tone: "gold" })}/>)}
@@ -243,7 +290,8 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} viewerKey={demoUser.id} onClose={() => setSheet(null)}/>}
+      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} viewerKey={demoUser.id} itemsOverride={(typeof sheet === "string" ? sheet : sheet.kind) === "broker" ? ownerBrokerProposalItems : ownerDirectProposalItems} onClose={() => setSheet(null)} onProposalStateChange={updateProposalState}/>} 
+      {officeDetail && <OfficeDetail office={officeDetail} contracted={contractedOfficeId === officeDetail.id} onContract={setContractedOfficeId} onClose={() => setOfficeDetail(null)}/>} 
       <Header role={role} availableRoles={availableRoles} title="소유주 홈" subtitle="빠르게 집을 내놓아요" mood="calm" onSwitchRole={onSwitchRole} actionLabel="매물 의뢰하기" onAction={onRegister}/>
       <div style={{ padding: "18px 16px 0" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -251,17 +299,17 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
           <StatCard value={ownerProposalCounts.brokers + "곳"} label="의뢰받은 부동산" tone="green" onClick={() => setSheet("broker")}/>
           <StatCard value={ownerProposalCounts.direct + "명"} label="직거래 매수자" tone="gold" onClick={() => setSheet("direct")}/>
         </div>
-        <TaskList items={[
+        <TaskList cacheKey={todayTaskKey} items={[
           ["새롭게 제안한 부동산", `아직 확인하지 않은 제안 ${ownerProposalCounts.newBrokers}곳`, () => setSheet({ kind: "broker", mode: "new" })],
           ["새롭게 제안한 직거래 매수자", `아직 확인하지 않은 매수자 ${ownerProposalCounts.newDirect}명`, () => setSheet({ kind: "direct", mode: "new" })],
           ["내 매물 확인", `${ownerActiveCount}건 진행 중이에요`, () => onMyList()],
           ["만료 임박", `${ownerExpiringCount}건은 의뢰 기간 확인이 필요해요`, () => onMyList({ statusFilter: "만료 임박" })],
         ]}/>
         <SectionTitle title="기본지역 추천 부동산" actionLabel="기본지역 부동산으로 이동" onAction={onOffices}/>
-        {(baseOffices.length ? baseOffices : ownerOffices.slice(0, 2)).map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={onOffices}/>)}
+        {(baseOffices.length ? baseOffices : ownerOffices.slice(0, 2)).map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={() => setOfficeDetail(b)}/>)}
         {hasInterestSection && <>
           <SectionTitle title="관심지역 추천 부동산" actionLabel="관심지역 부동산으로 이동" onAction={onOffices}/>
-          {interestOffices.map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={onOffices}/>)}
+          {interestOffices.map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={() => setOfficeDetail(b)}/>)}
         </>}
         <SectionTitle title="내 매물" actionLabel="내 매물로 이동" onAction={() => onMyList()}/>
         {ownerSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => onMyList()}/>)}
