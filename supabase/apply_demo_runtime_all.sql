@@ -926,3 +926,85 @@ with check (true);
 
 grant select, insert, update on table public.user_points to anon, authenticated;
 grant select, insert on table public.point_ledger to anon, authenticated;
+
+-- ============================================================
+-- supabase\migrations\202605290008_koreanize_demo_listings.sql
+-- ============================================================
+-- seed 留ㅻЪ???쒓??뷀븯怨??뚯쑀二??녿뒗 ?덉쟾 ?뚯뒪??留ㅻЪ????젣?쒕떎.
+
+delete from public.listings
+where owner_key is null;
+
+with seed as (
+  select
+    g,
+    'listing-' || lpad(g::text, 3, '0') as demo_listing_id,
+    (array['媛뺣궓援?,'?쒖큹援?,'?≫뙆援?,'留덊룷援?,'?⑹궛援?,'?깅룞援?,'?곷벑?ш뎄','愿묒쭊援?])[(g - 1) % 8 + 1] as region,
+    (array['??궪??,'諛섑룷??,'?좎떎??,'怨듬뜒??,'?댁큿??,'?깆닔??,'?ъ쓽?꾨룞','愿묒옣??])[(g - 1) % 8 + 1] as dong,
+    (array['?섎???,'?먯씠','?먯뒪?뚯씠??,'?몃Ⅴ吏??,'濡?뜲罹먯뒳','?붿꺏','?꾩씠?뚰겕','瑜댁떆??,'?뚰겕由ъ삤','?쒓컯酉?])[(g - 1) % 10 + 1] || ' ' || (((g - 1) % 5) + 1) || '李? as complex,
+    (array['?꾪뙆??,'?ㅽ뵾?ㅽ뀛','鍮뚮씪','?곴?','?좎?'])[(g - 1) % 5 + 1] as prop_type,
+    (array['留ㅻℓ','?꾩꽭','?붿꽭','?꾨?'])[(g - 1) % 4 + 1] as deal_type,
+    45000 + (g * 2600) as price_num,
+    33 + (((g - 1) % 6) * 13) as area,
+    1 + ((g * 3) % 29) as floor
+  from generate_series(1, 50) as g
+),
+korean_seed as (
+  select
+    *,
+    region || ' ' || dong || ' ' || complex as title,
+    '?쒖슱 ' || region || ' ' || dong as address,
+    case
+      when deal_type = '?붿꽭' then '5,000/' || (80 + (g * 7) % 180) || '留?
+      when deal_type = '?꾨?' then '1??' || (90 + (g * 5) % 160) || '留?
+      when price_num % 10000 = 0 then (price_num / 10000) || '??
+      else (price_num / 10000) || '??' || to_char(price_num % 10000, 'FM9,999') || '留?
+    end as price_label,
+    case
+      when deal_type = '?꾩꽭' then '?꾩꽭?꾨즺'
+      when deal_type in ('?붿꽭','?꾨?') then '?꾨??꾨즺'
+      else '留ㅻ룄?꾨즺'
+    end as done_label
+  from seed
+)
+update public.listings as listings
+set
+  title = korean_seed.title,
+  address = korean_seed.address,
+  region = korean_seed.region,
+  dong = korean_seed.dong,
+  complex = korean_seed.complex,
+  prop_type = korean_seed.prop_type,
+  deal_type = korean_seed.deal_type,
+  price_label = korean_seed.price_label,
+  price_num = korean_seed.price_num,
+  price = korean_seed.price_num,
+  area = korean_seed.area,
+  floor = korean_seed.floor,
+  done_label = korean_seed.done_label,
+  move_in_date = case when korean_seed.g % 3 = 0 then '利됱떆?낆＜' else '?묒쓽 媛?? end,
+  loan = case when korean_seed.g % 4 = 0 then '?異??묒쓽' else '?異?媛?? end,
+  description = '?뚯쑀二?怨꾩젙?쇰줈 ?깅줉???ㅼ젣 援щ룞 ?뚯뒪??留ㅻЪ?낅땲??',
+  maintenance = '20留뚯썝',
+  parking = '1? 媛??,
+  direction = case when korean_seed.g % 2 = 0 then '?⑦뼢' else '?숉뼢' end,
+  special = '?ㅼ젣 ?뚯쑀二쇨? ?깅줉???쒓? ?뚯뒪??留ㅻЪ?낅땲??',
+  tenant = case when korean_seed.g % 4 = 0 then '?꾩감???덉쓬' else '怨듭떎' end,
+  tenant_end = case when korean_seed.g % 4 = 0 then '2027??3?? else null end,
+  tenant_deposit = case when korean_seed.g % 4 = 0 then '50000' else null end,
+  tenant_monthly = case when korean_seed.g % 4 = 0 then '120' else null end,
+  tenant_memo = case when korean_seed.g % 4 = 0 then '?꾩감???뺤씤 ?꾩슂' else null end
+from korean_seed
+where listings.demo_listing_id = korean_seed.demo_listing_id;
+
+update public.broker_proposals as broker_proposals
+set listing_title = listings.region || ' ' || listings.dong || ' ' || listings.complex || ' / ' || coalesce(listings.exclusive_area, listings.area)::text || '??
+from public.listings as listings
+where broker_proposals.listing_id = listings.demo_listing_id
+  and listings.demo_listing_id like 'listing-%';
+
+update public.direct_buyer_proposals as direct_buyer_proposals
+set listing_title = listings.region || ' ' || listings.dong || ' ' || listings.complex || ' / ' || coalesce(listings.exclusive_area, listings.area)::text || '??
+from public.listings as listings
+where direct_buyer_proposals.listing_id = listings.demo_listing_id
+  and listings.demo_listing_id like 'listing-%';
