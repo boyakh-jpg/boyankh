@@ -229,11 +229,37 @@ select
   jsonb_build_array(jsonb_build_object('id', 'review-' || id, 'tags', array['빠른 응답','시세 설명'], 'text', '진행 상황을 구체적으로 공유해줬어요.', 'createdAt', '2026-05-29'))
 from offices;
 
-with seed as (
+with owner_listing_counts as (
+  select
+    g as owner_no,
+    'owner-' || lpad(g::text, 3, '0') as owner_key,
+    case
+      when g <= 5 then 1
+      when g <= 10 then 2
+      when g <= 15 then 3
+      else 4
+    end as listing_count
+  from generate_series(1, 20) as g
+),
+owner_listing_slots as (
+  select
+    owner_no,
+    owner_key,
+    slot
+  from owner_listing_counts
+  join lateral generate_series(1, listing_count) as slots(slot) on true
+),
+seed_base as (
+  select
+    row_number() over (order by owner_no, slot) as g,
+    owner_key
+  from owner_listing_slots
+),
+seed as (
   select
     g,
     'listing-' || lpad(g::text, 3, '0') as demo_listing_id,
-    'owner-' || lpad((((g - 1) % 20) + 1)::text, 3, '0') as owner_key,
+    owner_key,
     (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1] as region,
     (array['Yeoksam','Banpo','Jamsil','Gongdeok','Ichon','Seongsu','Yeouido','Gwangjang'])[(g - 1) % 8 + 1] as dong,
     (array['Raemian','Xi','Hillstate','Prugio','Lotte Castle','The Sharp','I-Park','Leciel','Park Rio','Hangang View'])[(g - 1) % 10 + 1] || ' ' || (((g - 1) % 5) + 1) || 'cha' as complex,
@@ -246,7 +272,7 @@ with seed as (
     (g * 17) % 140 as views,
     g % 9 as created_days_ago,
     greatest(1, 14 - (g % 13)) as expires_in_days
-  from generate_series(1, 50) as g
+  from seed_base
 )
 insert into public.listings (
   demo_listing_id, owner_key, title, price, address, region, dong, complex, prop_type, deal_type,
