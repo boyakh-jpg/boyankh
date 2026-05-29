@@ -132,6 +132,66 @@ create table if not exists public.point_ledger (
   created_at timestamptz not null default now()
 );
 
+alter table public.demo_users add column if not exists role text;
+alter table public.demo_users add column if not exists name text;
+alter table public.demo_users add column if not exists label text;
+alter table public.demo_users add column if not exists description text;
+alter table public.demo_users add column if not exists region text;
+alter table public.demo_users add column if not exists phone text;
+alter table public.demo_users add column if not exists created_at timestamptz default now();
+
+alter table public.broker_offices add column if not exists broker_user_id text;
+alter table public.broker_offices add column if not exists office_name text;
+alter table public.broker_offices add column if not exists agent_name text;
+alter table public.broker_offices add column if not exists license_no text;
+alter table public.broker_offices add column if not exists address text;
+alter table public.broker_offices add column if not exists phone text;
+alter table public.broker_offices add column if not exists region text;
+alter table public.broker_offices add column if not exists specialty_regions text[] default '{}';
+alter table public.broker_offices add column if not exists specialty_types text[] default '{}';
+alter table public.broker_offices add column if not exists verified_deals_12m integer default 0;
+alter table public.broker_offices add column if not exists percentile_in_region integer default 99;
+alter table public.broker_offices add column if not exists tier text default 'verified';
+alter table public.broker_offices add column if not exists review_count integer default 0;
+alter table public.broker_offices add column if not exists response_mode text default 'chat';
+alter table public.broker_offices add column if not exists business_hours text default '09:00-18:00';
+alter table public.broker_offices add column if not exists last_active text default 'today';
+alter table public.broker_offices add column if not exists proposal_message text default '';
+alter table public.broker_offices add column if not exists reviews jsonb default '[]'::jsonb;
+alter table public.broker_offices add column if not exists created_at timestamptz default now();
+
+alter table public.broker_proposals add column if not exists owner_key text;
+alter table public.broker_proposals add column if not exists listing_id text;
+alter table public.broker_proposals add column if not exists broker_office_id text;
+alter table public.broker_proposals add column if not exists activity_type text;
+alter table public.broker_proposals add column if not exists proposal_new boolean default true;
+alter table public.broker_proposals add column if not exists request_id text;
+alter table public.broker_proposals add column if not exists chat_id text;
+alter table public.broker_proposals add column if not exists listing_title text;
+alter table public.broker_proposals add column if not exists created_at timestamptz default now();
+
+alter table public.direct_buyer_proposals add column if not exists owner_key text;
+alter table public.direct_buyer_proposals add column if not exists buyer_user_id text;
+alter table public.direct_buyer_proposals add column if not exists listing_id text;
+alter table public.direct_buyer_proposals add column if not exists name text;
+alter table public.direct_buyer_proposals add column if not exists note text;
+alter table public.direct_buyer_proposals add column if not exists budget text;
+alter table public.direct_buyer_proposals add column if not exists activity_type text;
+alter table public.direct_buyer_proposals add column if not exists proposal_new boolean default true;
+alter table public.direct_buyer_proposals add column if not exists request_id text;
+alter table public.direct_buyer_proposals add column if not exists chat_id text;
+alter table public.direct_buyer_proposals add column if not exists listing_title text;
+alter table public.direct_buyer_proposals add column if not exists created_at timestamptz default now();
+
+alter table public.user_points add column if not exists balance integer default 0;
+alter table public.user_points add column if not exists updated_at timestamptz default now();
+
+alter table public.point_ledger add column if not exists user_key text;
+alter table public.point_ledger add column if not exists delta integer;
+alter table public.point_ledger add column if not exists balance_after integer;
+alter table public.point_ledger add column if not exists reason text;
+alter table public.point_ledger add column if not exists created_at timestamptz default now();
+
 do $$
 declare
   table_name text;
