@@ -214,6 +214,7 @@ export async function savePointBalance({ userId, balance, delta = 0, reason = "p
 
 const safeListingForChat = listing => ({
   id: listing.id,
+  demoListingId: listing.demoListingId || listing.demo_listing_id || null,
   ownerKey: listing.ownerKey || listing.owner_key || null,
   ownerLabel: listing.ownerLabel || listing.ownerName || null,
   region: listing.region,

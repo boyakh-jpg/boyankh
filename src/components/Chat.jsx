@@ -21,15 +21,62 @@ const DEMO_TEST_CHAT = {
 };
 
 const ownerLabelFromKey = key => {
-  if (!key) return "매물 소유주";
+  if (!key) return "소유주 미지정";
   return String(key).startsWith("owner-") ? `소유주 ${String(key).replace("owner-", "")}` : String(key);
+};
+
+const ownerLabelMissing = label => !label || ["매물 소유주", "소유주 미지정"].includes(String(label));
+
+const ownerLabelFromUsers = (users, key) => {
+  if (!key) return "";
+  const user = (Array.isArray(users) ? users : []).find(item => item.id === key);
+  return user?.label || user?.name || ownerLabelFromKey(key);
+};
+
+const listingIds = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id]
+  .filter(value => value !== undefined && value !== null && value !== "")
+  .map(value => String(value));
+
+const fallbackOwnerKeyFromListing = listing => {
+  const source = listing?.demoListingId || listing?.demo_listing_id || listing?.id || "";
+  const match = String(source).match(/\d+/);
+  if (!match) return null;
+  return `owner-${String(((Number(match[0]) - 1) % 20) + 1).padStart(3, "0")}`;
+};
+
+const findMatchingListing = (listing, properties = []) => {
+  const ids = listingIds(listing);
+  if (!ids.length) return null;
+  return properties.find(item => listingIds(item).some(id => ids.includes(id))) || null;
+};
+
+const enrichChatContext = (context, properties = [], users = []) => {
+  if (!context?.listing) return context;
+  const matchedListing = findMatchingListing(context.listing, properties);
+  const listing = matchedListing ? { ...context.listing, ...matchedListing } : { ...context.listing };
+  const ownerKey = listing.ownerKey || listing.owner_key || context.ownerKey || fallbackOwnerKeyFromListing(listing);
+  const ownerLabel = ownerLabelMissing(listing.ownerLabel || listing.ownerName)
+    ? ownerLabelFromUsers(users, ownerKey) || ownerLabelFromKey(ownerKey)
+    : listing.ownerLabel || listing.ownerName;
+
+  return {
+    ...context,
+    listing: {
+      ...listing,
+      ownerKey,
+      ownerLabel,
+    },
+  };
 };
 
 const chatFromContext = (context, role = "buyer") => {
   if (!context?.listing) return null;
   const listing = context.listing;
   const property = `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim();
-  const ownerLabel = listing.ownerLabel || listing.ownerName || ownerLabelFromKey(listing.ownerKey || listing.owner_key);
+  const ownerKey = listing.ownerKey || listing.owner_key || fallbackOwnerKeyFromListing(listing);
+  const ownerLabel = ownerLabelMissing(listing.ownerLabel || listing.ownerName)
+    ? ownerLabelFromKey(ownerKey)
+    : listing.ownerLabel || listing.ownerName;
   const expired = isDone(listing) || isTermExpired(listing);
   const direct = context.mode === "직거래";
   const ownerView = role === "owner";
@@ -49,7 +96,7 @@ const chatFromContext = (context, role = "buyer") => {
     unread: 0,
     mode: context.mode || (listing.fast ? "빠른의뢰" : "안심의뢰"),
     expired,
-    ownerKey: listing.ownerKey || listing.owner_key || null,
+    ownerKey,
     ownerLabel,
     buyerKey: context.buyerKey || null,
     brokerKey: context.brokerKey || null,
@@ -152,10 +199,10 @@ const chatsForRole = (role, demoUser = getDemoUser()) => [
   }),
 ];
 
-export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
-  const demoUser = getDemoUser();
+export function ChatList({ onOpen, role, availableRoles, onSwitchRole, properties = [], demoUsers = [] }) {
+  const demoUser = getDemoUser(demoUsers.length ? demoUsers : undefined);
   const [savedContexts, setSavedContexts] = useState(() => loadChatContextsForUser(demoUser.id, role));
-  const savedChats = savedContexts.map(context => chatFromContext(context, role)).filter(Boolean);
+  const savedChats = savedContexts.map(context => chatFromContext(enrichChatContext(context, properties, demoUsers), role)).filter(Boolean);
   const visibleChats = [...new Map([...chatsForRole(role, demoUser), ...savedChats].map(chat => [chat.id, chat])).values()];
   const visibleChatIds = visibleChats.map(c => c.id).join("|");
   const [latestByThread, setLatestByThread] = useState({});
@@ -259,9 +306,10 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole }) {
   );
 }
 
-export function ChatRoom({ chatId, chatContext = null, role, listingContracts = {}, onContractListing, onBack }) {
-  const demoUser = getDemoUser();
-  const storedContext = chatContext?.id === chatId ? chatContext : loadChatContexts().find(context => context.id === chatId);
+export function ChatRoom({ chatId, chatContext = null, role, listingContracts = {}, onContractListing, onBack, properties = [], demoUsers = [] }) {
+  const demoUser = getDemoUser(demoUsers.length ? demoUsers : undefined);
+  const rawContext = chatContext?.id === chatId ? chatContext : loadChatContexts().find(context => context.id === chatId);
+  const storedContext = enrichChatContext(rawContext, properties, demoUsers);
   const contextChat = storedContext ? chatFromContext(storedContext, role) : null;
   const chat = contextChat || chatsForRole(role, demoUser).find(c => c.id === chatId) || DEMO_TEST_CHAT;
   const accessDenied =
@@ -434,7 +482,7 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
         </div>
         <div style={{ background: "#ffffff26", borderRadius: 12, padding: "8px 12px", marginTop: 12, fontSize: 12, color: "#fff", display: "grid", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ opacity: .85 }}>매물</span><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.property}</span></div>
-          {chat.ownerLabel && role !== "owner" && <div style={{ color: "#ffffffd9", fontWeight: 800 }}>소유주 {chat.ownerLabel}</div>}
+          {chat.ownerLabel && role !== "owner" && <div style={{ color: "#ffffffd9", fontWeight: 800 }}>{chat.ownerLabel}</div>}
         </div>
         {canContractListing && (
           <button onClick={contractListing} disabled={contractedHere || contractedElsewhere} style={{ width: "100%", marginTop: 8, border: "none", background: contractedHere ? G.gold : contractedElsewhere ? "#D5DDD7" : "#fff", color: contractedHere ? "#fff" : contractedElsewhere ? C.gray : C.greenInk, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: contractedHere || contractedElsewhere ? "default" : "pointer", fontFamily: "inherit" }}>
