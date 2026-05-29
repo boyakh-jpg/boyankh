@@ -1,3 +1,8 @@
+﻿-- Apply this whole file once in Supabase SQL Editor.
+
+-- ============================================================
+-- supabase\migrations\202605290002_seed_demo_runtime.sql
+-- ============================================================
 -- Seed a usable demo runtime without admin secret keys.
 -- Run in Supabase SQL Editor before 202605290001_secure_listings_rls.sql.
 
@@ -237,17 +242,17 @@ where owner_key like 'owner-%'
    or owner_key in ('toad-demo-owner', 'toad-demo-owner-2');
 
 insert into public.demo_users (id, role, name, label, description, region, phone)
-select 'owner-' || lpad(g::text, 3, '0'), 'owner', '소유주 ' || lpad(g::text, 3, '0'), '소유주 ' || lpad(g::text, 3, '0'), '매물 등록 테스트 소유주',
+select 'owner-' || lpad(g::text, 3, '0'), 'owner', '?뚯쑀二?' || lpad(g::text, 3, '0'), '?뚯쑀二?' || lpad(g::text, 3, '0'), '留ㅻЪ ?깅줉 ?뚯뒪???뚯쑀二?,
        (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1],
        '010-' || lpad((3100 + g)::text, 4, '0') || '-' || lpad((7000 + g)::text, 4, '0')
 from generate_series(1, 20) as g
 union all
-select 'broker-' || lpad(g::text, 3, '0'), 'broker', '중개사 ' || lpad(g::text, 3, '0'), '중개사 ' || lpad(g::text, 3, '0'), '부동산 상세카드 테스트 중개사',
+select 'broker-' || lpad(g::text, 3, '0'), 'broker', '以묎컻??' || lpad(g::text, 3, '0'), '以묎컻??' || lpad(g::text, 3, '0'), '遺?숈궛 ?곸꽭移대뱶 ?뚯뒪??以묎컻??,
        (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1],
        '010-' || lpad((4100 + g)::text, 4, '0') || '-' || lpad((6000 + g)::text, 4, '0')
 from generate_series(1, 30) as g
 union all
-select 'buyer-' || lpad(g::text, 3, '0'), 'buyer', '직거래 매수자 ' || lpad(g::text, 3, '0'), '직거래 매수자 ' || lpad(g::text, 3, '0'), '직거래 매수 테스트 계정',
+select 'buyer-' || lpad(g::text, 3, '0'), 'buyer', '吏곴굅??留ㅼ닔??' || lpad(g::text, 3, '0'), '吏곴굅??留ㅼ닔??' || lpad(g::text, 3, '0'), '吏곴굅??留ㅼ닔 ?뚯뒪??怨꾩젙',
        (array['Gangnam','Seocho','Songpa','Mapo','Yongsan','Seongdong','Yeongdeungpo','Gwangjin'])[(g - 1) % 8 + 1],
        '010-' || lpad((5100 + g)::text, 4, '0') || '-' || lpad((5000 + g)::text, 4, '0')
 from generate_series(1, 10) as g;
@@ -270,8 +275,8 @@ insert into public.broker_offices (
 select
   id,
   broker_user_id,
-  region || ' 토드공인중개사 ' || lpad(g::text, 2, '0'),
-  '공인중개사 ' || lpad(g::text, 2, '0'),
+  region || ' ?좊뱶怨듭씤以묎컻??' || lpad(g::text, 2, '0'),
+  '怨듭씤以묎컻??' || lpad(g::text, 2, '0'),
   '11' || lpad(g::text, 3, '0') || '-2026-' || lpad((100 + g)::text, 5, '0'),
   'Seoul ' || region || ' office ' || (100 + g),
   '02-' || lpad((7000 + g)::text, 4, '0') || '-' || lpad((2000 + g)::text, 4, '0'),
@@ -285,8 +290,8 @@ select
   (array['chat','call','sms'])[(g - 1) % 3 + 1],
   '09:00-18:00',
   case when g % 3 = 0 then 'before close' when g % 3 = 1 then 'active today' else 'active yesterday' end,
-  '지역 수요와 방문 일정을 확인했습니다. 오늘 바로 제안 가능해요.',
-  jsonb_build_array(jsonb_build_object('id', 'review-' || id, 'tags', array['빠른 응답','시세 설명'], 'text', '진행 상황을 구체적으로 공유해줬어요.', 'createdAt', '2026-05-29'))
+  '吏???섏슂? 諛⑸Ц ?쇱젙???뺤씤?덉뒿?덈떎. ?ㅻ뒛 諛붾줈 ?쒖븞 媛?ν빐??',
+  jsonb_build_array(jsonb_build_object('id', 'review-' || id, 'tags', array['鍮좊Ⅸ ?묐떟','?쒖꽭 ?ㅻ챸'], 'text', '吏꾪뻾 ?곹솴??援ъ껜?곸쑝濡?怨듭쑀?댁ㄼ?댁슂.', 'createdAt', '2026-05-29'))
 from offices;
 
 with owner_listing_counts as (
@@ -379,7 +384,7 @@ select
   2,
   'negotiable',
   'none',
-  '소유주 계정으로 등록된 테스트 매물입니다.',
+  '?뚯쑀二?怨꾩젙?쇰줈 ?깅줉???뚯뒪??留ㅻЪ?낅땲??',
   '200k monthly',
   'available',
   'south',
@@ -457,9 +462,9 @@ select
   l.owner_key,
   'buyer-' || lpad((((g - 1) % 10) + 1)::text, 3, '0'),
   l.demo_listing_id,
-  '직거래 매수자 ' || lpad(((((g - 1) % 10) + 1)::text), 3, '0'),
-  case when g % 2 = 0 then '실거주 목적, 대출 사전심사 완료' else '투자 목적, 빠른 잔금 협의 가능' end,
-  case when l.deal_type in ('Monthly','Lease') then '월 ' || (120 + g * 3) || '만 가능' else ((l.price_num / 10000) + 1) || '억대 가능' end,
+  '吏곴굅??留ㅼ닔??' || lpad(((((g - 1) % 10) + 1)::text), 3, '0'),
+  case when g % 2 = 0 then '?ㅺ굅二?紐⑹쟻, ?異??ъ쟾?ъ궗 ?꾨즺' else '?ъ옄 紐⑹쟻, 鍮좊Ⅸ ?붽툑 ?묒쓽 媛?? end,
+  case when l.deal_type in ('Monthly','Lease') then '??' || (120 + g * 3) || '留?媛?? else ((l.price_num / 10000) + 1) || '?듬? 媛?? end,
   case when g % 3 = 0 then U&'\C5F4\B78C' else U&'\C548\C2EC\C758\B8B0' end,
   case when l.owner_key = 'owner-001' then g in (1, 41) else g % 5 = 0 end,
   case when g % 3 = 0 then null else 'direct-request-' || lpad(g::text, 3, '0') end,
@@ -474,3 +479,301 @@ insert into public.user_points (user_key, balance, updated_at)
 select id, case role when 'broker' then 50000 when 'buyer' then 30000 else 12000 end, now()
 from public.demo_users
 on conflict (user_key) do update set balance = excluded.balance, updated_at = now();
+
+-- ============================================================
+-- supabase\migrations\202605290003_reseed_owner_listing_distribution.sql
+-- ============================================================
+-- Reassign seeded listings so each demo owner has 1 to 4 listings.
+-- Run after 202605290002_seed_demo_runtime.sql if that seed was already applied.
+
+with owner_listing_counts as (
+  select
+    g as owner_no,
+    'owner-' || lpad(g::text, 3, '0') as owner_key,
+    case
+      when g <= 5 then 1
+      when g <= 10 then 2
+      when g <= 15 then 3
+      else 4
+    end as listing_count
+  from generate_series(1, 20) as g
+),
+owner_listing_slots as (
+  select
+    owner_no,
+    owner_key,
+    slot
+  from owner_listing_counts
+  join lateral generate_series(1, listing_count) as slots(slot) on true
+),
+listing_owner_map as (
+  select
+    'listing-' || lpad((row_number() over (order by owner_no, slot))::text, 3, '0') as demo_listing_id,
+    owner_key
+  from owner_listing_slots
+)
+update public.listings as listings
+set owner_key = listing_owner_map.owner_key
+from listing_owner_map
+where listings.demo_listing_id = listing_owner_map.demo_listing_id;
+
+with owner_listing_counts as (
+  select
+    g as owner_no,
+    'owner-' || lpad(g::text, 3, '0') as owner_key,
+    case
+      when g <= 5 then 1
+      when g <= 10 then 2
+      when g <= 15 then 3
+      else 4
+    end as listing_count
+  from generate_series(1, 20) as g
+),
+owner_listing_slots as (
+  select
+    owner_no,
+    owner_key,
+    slot
+  from owner_listing_counts
+  join lateral generate_series(1, listing_count) as slots(slot) on true
+),
+listing_owner_map as (
+  select
+    'listing-' || lpad((row_number() over (order by owner_no, slot))::text, 3, '0') as demo_listing_id,
+    owner_key
+  from owner_listing_slots
+)
+update public.broker_proposals as broker_proposals
+set owner_key = listing_owner_map.owner_key
+from listing_owner_map
+where broker_proposals.listing_id = listing_owner_map.demo_listing_id;
+
+with owner_listing_counts as (
+  select
+    g as owner_no,
+    'owner-' || lpad(g::text, 3, '0') as owner_key,
+    case
+      when g <= 5 then 1
+      when g <= 10 then 2
+      when g <= 15 then 3
+      else 4
+    end as listing_count
+  from generate_series(1, 20) as g
+),
+owner_listing_slots as (
+  select
+    owner_no,
+    owner_key,
+    slot
+  from owner_listing_counts
+  join lateral generate_series(1, listing_count) as slots(slot) on true
+),
+listing_owner_map as (
+  select
+    'listing-' || lpad((row_number() over (order by owner_no, slot))::text, 3, '0') as demo_listing_id,
+    owner_key
+  from owner_listing_slots
+)
+update public.direct_buyer_proposals as direct_buyer_proposals
+set owner_key = listing_owner_map.owner_key
+from listing_owner_map
+where direct_buyer_proposals.listing_id = listing_owner_map.demo_listing_id;
+
+-- ============================================================
+-- supabase\migrations\202605290001_secure_listings_rls.sql
+-- ============================================================
+-- Secure listings writes.
+-- Read stays public. Insert/update/delete require Supabase Auth ownership.
+
+alter table public.listings
+  add column if not exists user_id uuid references auth.users(id) on delete set null;
+
+alter table public.listings
+  alter column user_id set default auth.uid();
+
+create index if not exists listings_user_id_idx on public.listings(user_id);
+
+alter table public.listings enable row level security;
+
+drop policy if exists "public can read listings" on public.listings;
+drop policy if exists "public can insert listings" on public.listings;
+drop policy if exists "authenticated can insert own`listings" on public.listings;
+drop policy if exists "authenticated can update own listings" on public.listings;
+drop policy if exists "authenticated can delete own listings" on public.listings;
+
+create policy "public can read listings"
+on public.listings
+for select
+to anon, authenticated
+using (true);
+
+create policy "authenticated can insert own listings"
+on public.listings
+for insert
+to authenticated
+with check (user_id = auth.uid());
+
+create policy "authenticated can update own listings"
+on public.listings
+for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+create policy "authenticated can delete own listings"
+on public.listings
+for delete
+to authenticated
+using (user_id = auth.uid());
+
+grant select on table public.listings to anon, authenticated;
+grant insert, update, delete on table public.listings to authenticated;
+revoke insert, update, delete on table public.listings from anon;
+
+-- ============================================================
+-- supabase\migrations\202605290004_enable_demo_runtime_rls.sql
+-- ============================================================
+-- Re-enable RLS after demo seed.
+-- Demo catalog tables are public-read only.
+-- Demo state and points stay anon-writable for MVP test accounts.
+
+alter table public.demo_users enable row level security;
+alter table public.broker_offices enable row level security;
+alter table public.broker_proposals enable row level security;
+alter table public.direct_buyer_proposals enable row level security;
+
+drop policy if exists "public can read demo users" on public.demo_users;
+drop policy if exists "public can read broker offices" on public.broker_offices;
+drop policy if exists "public can read broker proposals" on public.broker_proposals;
+drop policy if exists "public can read direct buyer proposals" on public.direct_buyer_proposals;
+
+create policy "public can read demo users"
+on public.demo_users
+for select
+to anon, authenticated
+using (true);
+
+create policy "public can read broker offices"
+on public.broker_offices
+for select
+to anon, authenticated
+using (true);
+
+create policy "public can read broker proposals"
+on public.broker_proposals
+for select
+to anon, authenticated
+using (true);
+
+create policy "public can read direct buyer proposals"
+on public.direct_buyer_proposals
+for select
+to anon, authenticated
+using (true);
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'demo_app_state',
+    'contact_unlocks',
+    'property_views',
+    'broker_applications',
+    'contact_requests',
+    'chats',
+    'chat_participants',
+    'chat_messages',
+    'profiles',
+    'support_tickets',
+    'reports'
+  ] loop
+    execute format('alter table public.%I enable row level security', table_name);
+    execute format('drop policy if exists "demo state can read" on public.%I', table_name);
+    execute format('drop policy if exists "demo state can insert" on public.%I', table_name);
+    execute format('drop policy if exists "demo state can update" on public.%I', table_name);
+    execute format('drop policy if exists "demo state can delete" on public.%I', table_name);
+    execute format('create policy "demo state can read" on public.%I for select to anon, authenticated using (true)', table_name);
+    execute format('create policy "demo state can insert" on public.%I for insert to anon, authenticated with check (true)', table_name);
+    execute format('create policy "demo state can update" on public.%I for update to anon, authenticated using (true) with check (true)', table_name);
+    execute format('create policy "demo state can delete" on public.%I for delete to anon, authenticated using (true)', table_name);
+  end loop;
+end $$;
+
+alter table public.user_points enable row level security;
+alter table public.point_ledger enable row level security;
+
+drop policy if exists "demo points can read" on public.user_points;
+drop policy if exists "demo points can insert" on public.user_points;
+drop policy if exists "demo points can update" on public.user_points;
+drop policy if exists "demo point ledger can read" on public.point_ledger;
+drop policy if exists "demo point ledger can insert" on public.point_ledger;
+
+create policy "demo points can read"
+on public.user_points
+for select
+to anon, authenticated
+using (true);
+
+create policy "demo points can insert"
+on public.user_points
+for insert
+to anon, authenticated
+with check (true);
+
+create policy "demo points can update"
+on public.user_points
+for update
+to anon, authenticated
+using (true)
+with check (true);
+
+create policy "demo point ledger can read"
+on public.point_ledger
+for select
+to anon, authenticated
+using (true);
+
+create policy "demo point ledger can insert"
+on public.point_ledger
+for insert
+to anon, authenticated
+with check (true);
+
+-- ============================================================
+-- supabase\migrations\202605290005_fix_chat_messages_schema.sql
+-- ============================================================
+-- Convert chat_messages from demo state shape to real message shape.
+
+drop table if exists public.chat_messages;
+
+create table public.chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id text not null,
+  sender_key text not null,
+  sender_name text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists chat_messages_thread_created_idx
+on public.chat_messages(thread_id, created_at);
+
+alter table public.chat_messages enable row level security;
+
+drop policy if exists "demo chat messages can read" on public.chat_messages;
+drop policy if exists "demo chat messages can insert" on public.chat_messages;
+
+create policy "demo chat messages can read"
+on public.chat_messages
+for select
+to anon, authenticated
+using (true);
+
+create policy "demo chat messages can insert"
+on public.chat_messages
+for insert
+to anon, authenticated
+with check (true);
+
+grant select, insert on table public.chat_messages to anon, authenticated;
