@@ -10,6 +10,7 @@ export const CACHE_KEYS = {
   buyerProposals: "toad.buyerProposals",
   pointLedger: "toad.pointLedger",
   chatMessages: "toad.chatMessages",
+  chatReads: "toad.chatReads",
   proposalViews: "toad.proposalViews",
   listingContracts: "toad.listingContracts",
 };
@@ -21,7 +22,7 @@ const DEDICATED_STATE_TABLES = [
   { table: "property_views", patterns: ["brokerViewed"] },
   { table: "broker_applications", patterns: ["brokerSafeRequests"] },
   { table: "contact_requests", patterns: ["buyerRequests"] },
-  { table: "chats", patterns: ["chatContexts"] },
+  { table: "chats", patterns: ["chatContexts", "chatReads"] },
   { table: "profiles", patterns: ["settingsProfile"] },
   { table: "support_tickets", patterns: ["supportLastInquiry"] },
   { table: "reports", patterns: ["supportLastReport"] },
@@ -282,6 +283,32 @@ export async function syncCache(key, fallback) {
   const value = await loadBackendState(key, fallback);
   memoryCache[key] = value;
   return value;
+}
+
+export const chatReadStateKey = (userId, role) => `${CACHE_KEYS.chatReads}.${userId || "guest"}.${role || "guest"}`;
+
+export function isUnreadChatMessage(message, reads = {}, userId) {
+  const senderKey = message?.sender_key || message?.senderKey;
+  if (!message || senderKey === userId) return false;
+  const threadId = message.thread_id || message.threadId;
+  const createdAt = message.created_at || message.createdAt;
+  const readAt = reads?.[threadId];
+  if (!readAt) return true;
+  return Date.parse(createdAt || "") > Date.parse(readAt || "");
+}
+
+export function countUnreadChatMessages(messages = [], reads = {}, userId) {
+  return messages.reduce((total, message) => total + (isUnreadChatMessage(message, reads, userId) ? 1 : 0), 0);
+}
+
+export function markChatThreadRead(userId, role, threadId, readAt = new Date().toISOString()) {
+  if (!threadId) return {};
+  const key = chatReadStateKey(userId, role);
+  const cached = loadCache(key, {});
+  const base = cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {};
+  const next = { ...base, [threadId]: readAt };
+  saveCache(key, next);
+  return next;
 }
 
 export function makeContactDecision({ requestId, actorType, actorId, listingId, decision }) {

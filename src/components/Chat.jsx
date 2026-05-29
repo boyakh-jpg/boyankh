@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G, SH2 } from "../theme";
-import { CACHE_KEYS, loadCache, saveCache, loadChatContexts, loadChatContextsForUser, syncCache, syncChatContexts } from "../data/cache";
+import { CACHE_KEYS, chatReadStateKey, isUnreadChatMessage, loadCache, saveCache, loadChatContexts, loadChatContextsForUser, markChatThreadRead, syncCache, syncChatContexts } from "../data/cache";
 import { getDemoUser } from "../data/demoUsers";
 import { supabase } from "../supabaseClient";
 import { isDone, isTermExpired } from "../utils/helpers";
@@ -188,7 +188,11 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole, propertie
   const savedChats = savedContexts.map(context => chatFromContext(enrichChatContext(context, properties, demoUsers), role)).filter(Boolean);
   const visibleChats = [...new Map([...chatsForRole(role, demoUser), ...savedChats].map(chat => [chat.id, chat])).values()];
   const visibleChatIds = visibleChats.map(c => c.id).join("|");
+  const readsKey = chatReadStateKey(demoUser.id, role);
+  const [chatReads, setChatReads] = useState(() => loadCache(readsKey, {}));
   const [latestByThread, setLatestByThread] = useState({});
+  const [unreadByThread, setUnreadByThread] = useState({});
+  const chatReadsStamp = JSON.stringify(chatReads || {});
 
   useEffect(() => {
     let alive = true;
@@ -200,13 +204,30 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole, propertie
 
   useEffect(() => {
     let alive = true;
+    const cached = loadCache(readsKey, {});
+    setChatReads(cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {});
+    syncCache(readsKey, {}).then(next => {
+      if (!alive || !next || typeof next !== "object" || Array.isArray(next)) return;
+      setChatReads(next);
+    });
+    return () => { alive = false; };
+  }, [readsKey]);
+
+  useEffect(() => {
+    let alive = true;
     const threadIds = visibleChats.map(c => c.id);
     const threadSet = new Set(threadIds);
     async function loadLatestMessages() {
-      if (!threadIds.length) return;
+      if (!threadIds.length) {
+        if (alive) {
+          setLatestByThread({});
+          setUnreadByThread({});
+        }
+        return;
+      }
       const { data, error } = await supabase
         .from("chat_messages")
-        .select("thread_id,sender_name,body,created_at")
+        .select("thread_id,sender_key,sender_name,body,created_at")
         .in("thread_id", threadIds)
         .order("created_at", { ascending: true });
 
@@ -216,14 +237,21 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole, propertie
       }
 
       const next = {};
+      const nextUnread = {};
       (data || []).forEach(row => {
         next[row.thread_id] = {
           senderName: row.sender_name,
           text: row.body,
           time: chatTime(row.created_at),
         };
+        if (isUnreadChatMessage(row, chatReads, demoUser.id)) {
+          nextUnread[row.thread_id] = (nextUnread[row.thread_id] || 0) + 1;
+        }
       });
-      if (alive) setLatestByThread(next);
+      if (alive) {
+        setLatestByThread(next);
+        setUnreadByThread(nextUnread);
+      }
     }
 
     loadLatestMessages();
@@ -240,6 +268,9 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole, propertie
             time: chatTime(row.created_at),
           },
         }));
+        if (isUnreadChatMessage(row, chatReads, demoUser.id)) {
+          setUnreadByThread(prev => ({ ...prev, [row.thread_id]: (prev[row.thread_id] || 0) + 1 }));
+        }
       })
       .subscribe(status => {
         if (status === "CHANNEL_ERROR") console.error("Supabase chat_messages realtime list error");
@@ -249,7 +280,7 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole, propertie
       alive = false;
       supabase.removeChannel(channel);
     };
-  }, [role, demoUser.id, visibleChatIds]);
+  }, [role, demoUser.id, visibleChatIds, chatReadsStamp]);
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%" }}>
@@ -269,16 +300,22 @@ export function ChatList({ onOpen, role, availableRoles, onSwitchRole, propertie
           const last = latestByThread[c.id] || base[base.length - 1] || c.messages[c.messages.length - 1];
           const chatName = role === "owner" ? c.name : (c.ownerLabel || "매물 소유주");
           const propertyLabel = c.ownerLabel && role !== "owner" ? `${c.property} · ${c.ownerLabel}` : c.property;
+          const unread = unreadByThread[c.id] || 0;
+          const openThread = () => {
+            setChatReads(markChatThreadRead(demoUser.id, role, c.id));
+            setUnreadByThread(prev => ({ ...prev, [c.id]: 0 }));
+            onOpen(c.id);
+          };
           return (
-            <div key={c.id} onClick={() => onOpen(c.id)} style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2, cursor: "pointer", display: "flex", gap: 12, alignItems: "center" }}>
+            <div key={c.id} onClick={openThread} style={{ background: G.card, borderRadius: 18, padding: 16, marginBottom: 10, boxShadow: SH2, cursor: "pointer", display: "flex", gap: 12, alignItems: "center" }}>
               <div style={{ position: "relative" }}>
                 <div style={{ width: 46, height: 46, borderRadius: 14, background: c.mode==="안심의뢰"?G.greenSoft:G.goldSoft, display: "flex", alignItems: "center", justifyContent: "center" }}><Frog mood={c.mode==="직거래"?"love":"calm"} size={38}/></div>
-                {c.unread > 0 && <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, background: "#E8847C", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{c.unread}</div>}
+                {unread > 0 && <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, background: "#E8847C", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{unread}</div>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{chatName}</span><Tag tone={c.mode==="안심의뢰"?"green":"gold"}>{c.mode}</Tag></div>
                 <div style={{ fontSize: 12, color: C.gray, margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{propertyLabel}</div>
-                <div style={{ fontSize: 13, color: c.unread>0?C.dark:C.gray, fontWeight: c.unread>0?600:400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{last.text}</div>
+                <div style={{ fontSize: 13, color: unread>0?C.dark:C.gray, fontWeight: unread>0?600:400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{last.text}</div>
               </div>
               <span style={{ fontSize: 18, color: "#CBD5CD" }}>›</span>
             </div>
@@ -357,6 +394,9 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
   }, [chat.id, accessDenied]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+  useEffect(() => {
+    if (!accessDenied && chat.id) markChatThreadRead(demoUser.id, role, chat.id);
+  }, [accessDenied, chat.id, demoUser.id, role, msgs.length]);
 
   const appendMessage = async ({ senderKey, senderName, text }) => {
     const now = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });

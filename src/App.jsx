@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G } from "./theme";
-import { BROKER_OFFICES, CHATS } from "./data/data";
+import { BROKER_OFFICES } from "./data/data";
 import { Splash, Login, Role } from "./components/Onboarding";
 import { Register } from "./components/Register";
 import { Home } from "./components/Home";
@@ -15,7 +15,7 @@ import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { DEMO_USERS, getDemoUser } from "./data/demoUsers";
-import { CACHE_KEYS, loadBackendState, loadCache, loadLocalState, saveBackendState, saveCache, saveChatContext, syncCache } from "./data/cache";
+import { CACHE_KEYS, chatReadStateKey, countUnreadChatMessages, loadBackendState, loadCache, loadChatContextsForUser, loadLocalState, markChatThreadRead, saveBackendState, saveCache, saveChatContext, syncCache, syncChatContexts } from "./data/cache";
 import { loadDemoEnvironment } from "./data/supabaseData";
 
 const loadSetting = (key, fallback) => {
@@ -214,6 +214,7 @@ export default function App() {
   const [brokerOffices, setBrokerOffices] = useState(BROKER_OFFICES);
   const [brokerProposals, setBrokerProposals] = useState([]);
   const [directBuyerProposals, setDirectBuyerProposals] = useState([]);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [listingContracts, setListingContracts] = useState(() => {
     const cached = loadCache(CACHE_KEYS.listingContracts, {});
     return cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {};
@@ -410,6 +411,8 @@ export default function App() {
     setScreen("home");
   };
   const openChat = target => {
+    const nextChatId = target && typeof target === "object" ? target.id : target;
+    if (nextChatId) markChatThreadRead(demoUser.id, role, nextChatId);
     if (target && typeof target === "object") {
       saveChatContext(target);
       setActiveChat(target.id);
@@ -486,11 +489,54 @@ export default function App() {
     if (k === "mylist") setMyListPreset({});
     setScreen(k);
   };
-  const roleChats = CHATS.filter(c => role === "broker" ? c.mode !== "직거래" : role === "buyer" ? c.mode === "직거래" : true);
-  const totalUnread = roleChats.reduce((s, c) => s + c.unread, 0);
-  const ownerMenus = [{ k: "home", label: "홈" }, { k: "register", label: "의뢰하기" }, { k: "offices", label: "부동산" }, { k: "chatlist", label: "채팅", badge: totalUnread }, { k: "mylist", label: "내 매물" }];
-  const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
-  const buyerMenus = [{ k: "home", label: "홈" }, { k: "buyer", label: "매물" }, { k: "buyerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: totalUnread }];
+  useEffect(() => {
+    if (!role || !demoUser.id) {
+      setChatUnreadCount(0);
+      return;
+    }
+    let alive = true;
+    const readsKey = chatReadStateKey(demoUser.id, role);
+    const refreshUnread = async () => {
+      await syncChatContexts();
+      const contexts = loadChatContextsForUser(demoUser.id, role);
+      const threadIds = [...new Set(contexts.map(context => context.id).filter(Boolean))];
+      if (!threadIds.length) {
+        if (alive) setChatUnreadCount(0);
+        return;
+      }
+      const localReads = loadCache(readsKey, {});
+      const remoteReads = await syncCache(readsKey, localReads);
+      const reads = remoteReads && typeof remoteReads === "object" && !Array.isArray(remoteReads) ? remoteReads : {};
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("thread_id,sender_key,created_at")
+        .in("thread_id", threadIds);
+
+      if (error) {
+        console.error("Supabase chat_messages unread error:", error);
+        return;
+      }
+      if (alive) setChatUnreadCount(countUnreadChatMessages(data || [], reads, demoUser.id));
+    };
+
+    refreshUnread();
+    const channel = supabase
+      .channel(`chat-unread-${demoUser.id}-${role}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, () => {
+        refreshUnread();
+      })
+      .subscribe(status => {
+        if (status === "CHANNEL_ERROR") console.error("Supabase chat_messages unread realtime error");
+      });
+
+    return () => {
+      alive = false;
+      supabase.removeChannel(channel);
+    };
+  }, [demoUser.id, role, screen, activeChat]);
+  const ownerMenus = [{ k: "home", label: "홈" }, { k: "register", label: "의뢰하기" }, { k: "offices", label: "부동산" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }, { k: "mylist", label: "내 매물" }];
+  const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }];
+  const buyerMenus = [{ k: "home", label: "홈" }, { k: "buyer", label: "매물" }, { k: "buyerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }];
   const menus = role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus;
   const roleLabel = { owner: "소유주", broker: "중개사", buyer: "직거래" };
   const nextRole = availableRoles[(availableRoles.indexOf(role) + 1) % availableRoles.length] || availableRoles[0];
