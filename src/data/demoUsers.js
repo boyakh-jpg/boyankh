@@ -7,12 +7,12 @@ export const DEMO_USERS = [
   { id: "toad-demo-buyer-1", name: "직거래 박", role: "buyer", label: "직거래 박", desc: "직거래 채팅 테스트" },
 ];
 
-export function getDemoUser() {
+export function getDemoUser(users = DEMO_USERS) {
   try {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem(DEMO_USER_STORAGE_KEY) : null;
-    return DEMO_USERS.find(user => user.id === saved) || DEMO_USERS[0];
+    return users.find(user => user.id === saved) || users.find(user => user.role === "owner") || users[0] || DEMO_USERS[0];
   } catch {
-    return DEMO_USERS[0];
+    return users.find(user => user.role === "owner") || users[0] || DEMO_USERS[0];
   }
 }
 
