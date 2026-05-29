@@ -1,8 +1,6 @@
 ﻿import { useState } from "react";
-import { useEffect } from "react";
 import { C, G, SH1, SH2 } from "../theme";
-import { BROKER_OFFICES, REGIONS, PROPOSAL_CHAT_IDS } from "../data/data";
-import { CACHE_KEYS, loadCache, saveCache, syncCache } from "../data/cache";
+import { BROKER_OFFICES, REGIONS } from "../data/data";
 import { BrokerOfficeCard, SelectBox, Frog, RoleToggle, Tag } from "./common";
 
 const responseModeLabel = {
@@ -12,7 +10,7 @@ const responseModeLabel = {
   none: "응답 안 함",
 };
 
-function OfficeDetail({ office, contracted, onContract, onClose }) {
+export function OfficeDetail({ office, contracted, onContract, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "84%", overflowY: "auto", background: G.pageBg, borderRadius: "26px 26px 0 0", padding: "20px 18px 72px", boxSizing: "border-box", animation: "sheetUp .3s" }}>
@@ -77,25 +75,9 @@ function OfficeDetail({ office, contracted, onContract, onClose }) {
   );
 }
 
-export function BrokerOffices({ role = "owner", availableRoles, preferredRegion = "전체", interestRegion = "전체", onSwitchRole }) {
-  const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
-  const decisions = localDecisions && typeof localDecisions === "object" && !Array.isArray(localDecisions) ? localDecisions : {};
-  useEffect(() => {
-    let alive = true;
-    syncCache(CACHE_KEYS.contactDecisions, {}).then(next => {
-      if (alive && next && typeof next === "object" && !Array.isArray(next)) setLocalDecisions(next);
-    });
-    return () => { alive = false; };
-  }, []);
-  const decide = (key, value) => {
-    if (!key) return;
-    setLocalDecisions(d => {
-      const next = { ...(d && typeof d === "object" && !Array.isArray(d) ? d : {}), [key]: value };
-      saveCache(CACHE_KEYS.contactDecisions, next);
-      return next;
-    });
-  };
+export function BrokerOffices({ offices = BROKER_OFFICES, role = "owner", availableRoles, preferredRegion = "전체", interestRegion = "전체", onSwitchRole }) {
   const [sido, setSido] = useState("서울특별시");
+  const officeList = offices;
   const initialRegions = Array.from(new Set([preferredRegion, interestRegion].filter(r => r && r !== "전체")));
   const [regionGroup, setRegionGroup] = useState(initialRegions);
   const [region, setRegion] = useState("전체");
@@ -108,13 +90,13 @@ export function BrokerOffices({ role = "owner", availableRoles, preferredRegion 
     const tier = o.tier || "";
     return (tier.includes("대표") ? 4 : tier.includes("파워") ? 3 : tier.includes("우수") ? 2 : 1) * 1000 + (100 - (o.percentileInRegion || 100));
   };
-  const dongOptions = ["전체", ...Array.from(new Set(BROKER_OFFICES.filter(matchesRegion).map(officeDong))).sort()];
+  const dongOptions = ["전체", ...Array.from(new Set(officeList.filter(matchesRegion).map(officeDong))).sort()];
   const changeRegion = v => { setRegion(v); setRegionGroup([]); setDong("전체"); };
-  const list = BROKER_OFFICES.filter(o =>
+  const list = officeList.filter(o =>
     matchesRegion(o) &&
     (dong === "전체" || officeDong(o) === dong)
   ).sort((a, b) => tierScore(b) - tierScore(a));
-  const selectedOffice = BROKER_OFFICES.find(o => o.id === selected);
+  const selectedOffice = officeList.find(o => o.id === selected);
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
@@ -150,20 +132,7 @@ export function BrokerOffices({ role = "owner", availableRoles, preferredRegion 
           </div>
         </div>
         <div style={{ fontSize: 13, color: C.gray, marginBottom: 10 }}>총 {list.length}곳{regionGroup.length > 0 && ` · ${regionGroup.join("·")}`}</div>
-        {list.map(o => {
-          const chatId = PROPOSAL_CHAT_IDS[o.id];
-          return (
-            <BrokerOfficeCard
-              key={o.id}
-              broker={o}
-              actionLabel="상세 보기"
-              onClick={() => setSelected(o.id)}
-              decision={chatId ? decisions[chatId] : null}
-              onApprove={chatId ? () => decide(chatId, "approved") : null}
-              onReject={chatId ? () => decide(chatId, "rejected") : null}
-            />
-          );
-        })}
+        {list.map(o => <BrokerOfficeCard key={o.id} broker={o} actionLabel="상세 보기" onClick={() => setSelected(o.id)}/>)}
         <div style={{ height: 64 }}/>
       </div>
     </div>

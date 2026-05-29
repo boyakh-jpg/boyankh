@@ -10,10 +10,21 @@ export const CACHE_KEYS = {
   buyerProposals: "toad.buyerProposals",
   pointLedger: "toad.pointLedger",
   chatMessages: "toad.chatMessages",
+  proposalViews: "toad.proposalViews",
 };
 
 
 const APP_STATE_TABLE = "demo_app_state";
+const DEDICATED_STATE_TABLES = [
+  { table: "contact_unlocks", patterns: ["brokerContacted", "buyerUnlocked", "contactDecisions"] },
+  { table: "property_views", patterns: ["brokerViewed"] },
+  { table: "broker_applications", patterns: ["brokerSafeRequests"] },
+  { table: "contact_requests", patterns: ["buyerRequests"] },
+  { table: "chats", patterns: ["chatContexts"] },
+  { table: "profiles", patterns: ["settingsProfile"] },
+  { table: "support_tickets", patterns: ["supportLastInquiry"] },
+  { table: "reports", patterns: ["supportLastReport"] },
+];
 const STATE_STORAGE_PREFIX = "toad.state";
 const memoryCache = {};
 const POINT_BALANCE_PREFIX = "toad.pointBalance";
@@ -21,6 +32,9 @@ const CHAT_CONTEXTS_KEY = "toad.chatContexts";
 export const POINT_DEFAULTS = { owner: 12000, buyer: 30000, broker: 50000 };
 
 const stateStorageKey = key => `${STATE_STORAGE_PREFIX}.${key}`;
+
+const tableForStateKey = key =>
+  DEDICATED_STATE_TABLES.find(route => route.patterns.some(pattern => key.includes(pattern)))?.table || APP_STATE_TABLE;
 
 const readLocalJson = (key, fallback) => {
   try {
@@ -49,9 +63,10 @@ export function saveLocalState(key, value) {
 
 export async function loadBackendState(key, fallback) {
   const local = loadLocalState(key, fallback);
+  const table = tableForStateKey(key);
   try {
     const { data, error } = await supabase
-      .from(APP_STATE_TABLE)
+      .from(table)
       .select("payload")
       .eq("state_key", key)
       .maybeSingle();
@@ -62,20 +77,50 @@ export async function loadBackendState(key, fallback) {
       return data.payload;
     }
   } catch (error) {
-    console.error("Supabase demo_app_state load error:", error);
+    if (table === APP_STATE_TABLE) console.error("Supabase demo_app_state load error:", error);
+  }
+
+  if (table !== APP_STATE_TABLE) {
+    try {
+      const { data, error } = await supabase
+        .from(APP_STATE_TABLE)
+        .select("payload")
+        .eq("state_key", key)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data?.payload !== undefined && data?.payload !== null) {
+        saveLocalState(key, data.payload);
+        return data.payload;
+      }
+    } catch (error) {
+      console.error(`Supabase ${table} load fallback error:`, error);
+    }
   }
   return local;
 }
 
 export async function saveBackendState(key, value) {
   saveLocalState(key, value);
+  const table = tableForStateKey(key);
   try {
     const { error } = await supabase
-      .from(APP_STATE_TABLE)
+      .from(table)
       .upsert({ state_key: key, payload: value, updated_at: new Date().toISOString() }, { onConflict: "state_key" });
     if (error) throw error;
   } catch (error) {
-    console.error("Supabase demo_app_state save error:", error);
+    if (table === APP_STATE_TABLE) {
+      console.error("Supabase demo_app_state save error:", error);
+      return value;
+    }
+    try {
+      const { error: fallbackError } = await supabase
+        .from(APP_STATE_TABLE)
+        .upsert({ state_key: key, payload: value, updated_at: new Date().toISOString() }, { onConflict: "state_key" });
+      if (fallbackError) throw fallbackError;
+    } catch (fallbackError) {
+      console.error(`Supabase ${table} save fallback error:`, fallbackError);
+    }
   }
   return value;
 }
