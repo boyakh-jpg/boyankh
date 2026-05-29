@@ -272,7 +272,7 @@ export function getOwnerProposalItems(viewerKey, kind) {
         listingTitle: "강남구 대치동 은마아파트 · 76㎡",
         activityType: "안심의뢰",
         proposalNew: index === 0,
-        chatId: index === 0 ? "demo-test-chat" : null,
+        chatId: null,
       }));
     }
     return DIRECT_BUYERS.slice(0, 1).map(buyer => ({
@@ -283,7 +283,7 @@ export function getOwnerProposalItems(viewerKey, kind) {
       budget: "18억까지",
       proposalNew: true,
       requestId: "direct-safe-owner-b",
-      chatId: "demo-test-chat",
+      chatId: null,
       listingTitle: "강남구 대치동 은마아파트 · 76㎡",
     }));
   }

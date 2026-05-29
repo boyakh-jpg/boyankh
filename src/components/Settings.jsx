@@ -320,7 +320,7 @@ function BrokerSubPage({ page, brokerTier, onSubscription, onBack }) {
   );
 }
 
-export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", demoUsers = DEMO_USERS, onSubscription, onDemoUserChange, onOpenDemoChat, onBack }) {
+export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", demoUsers = DEMO_USERS, onSubscription, onDemoUserChange, onBack }) {
   const [accountPage, setAccountPage] = useState(null);
   const [brokerPage, setBrokerPage] = useState(null);
   const [demoUserId, setDemoUserId] = useState(() => getDemoUser().id);
@@ -369,7 +369,6 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
           <DemoUserSelect label="소유주 아이디" users={ownerDemoUsers} value={demoUserId} onChange={selectDemoUserId}/>
           <DemoUserSelect label="중개사 아이디" users={brokerDemoUsers} value={demoUserId} onChange={selectDemoUserId}/>
           <DemoUserSelect label="직거래 매수자 아이디" users={buyerDemoUsers} value={demoUserId} onChange={selectDemoUserId}/>
-          <button onClick={onOpenDemoChat} style={{ width: "100%", marginTop: 10, border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "11px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>테스트 채팅방 열기</button>
         </Section>
         <Section title="내 지역">
           <SelectBox label="기본 지역" value={preferredRegion} options={regionOptions} onChange={onRegionChange}/>

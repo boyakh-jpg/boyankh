@@ -6,19 +6,6 @@ import { supabase } from "../supabaseClient";
 import { isDone, isTermExpired } from "../utils/helpers";
 import { RoleToggle, Frog, Tag } from "./common";
 
-const DEMO_TEST_CHAT = {
-  id: "demo-test-chat",
-  name: "테스트 채팅방",
-  office: "테스트 아이디 전체",
-  property: "테스트 아이디 메시지 확인",
-  unread: 0,
-  mode: "테스트",
-  demo: true,
-  messages: [
-    { from: "broker", senderKey: "toad-demo-system", senderName: "테스트 안내", text: "테스트 아이디를 바꿔가며 같은 채팅방에서 메시지가 어떻게 보이는지 확인하세요.", time: "방금 전" },
-  ],
-};
-
 const ownerLabelFromKey = key => {
   if (!key) return "소유주 미지정";
   return String(key).startsWith("owner-") ? `소유주 ${String(key).replace("owner-", "")}` : String(key);
@@ -108,18 +95,6 @@ const chatFromContext = (context, role = "buyer") => {
 };
 
 const chatPartnerProfile = (chat, role, demoUser) => {
-  if (chat.demo) {
-    return {
-      name: "테스트 아이디 전체",
-      subtitle: "소유주 A/B, 중개사, 직거래 매수자와 대화 중",
-      subtitleLines: ["소유주 A/B · 중개사 · 직거래 매수자", "테스트 단체방"],
-      type: "테스트 참여자",
-      office: "공용 테스트 채팅방",
-      property: chat.property,
-      note: `${demoUser.label}로 메시지를 보내고 있어요.`,
-    };
-  }
-
   if (role === "owner") {
     const type = chat.mode === "직거래" ? "직거래 매수자" : "공인중개사";
     return {
@@ -170,7 +145,7 @@ const messageFromRow = row => ({
 
 const isNoticeMessage = message =>
   message.senderKey === "toad-demo-system" ||
-  ["채팅 안내", "테스트 안내", "연락처 요청", "계약 체결"].includes(message.senderName);
+  ["채팅 안내", "연락처 요청", "계약 체결"].includes(message.senderName);
 
 const upsertMessageRow = (messages, row) => {
   const next = messageFromRow(row);
@@ -204,7 +179,7 @@ const missingChatForId = chatId => ({
   ],
 });
 
-const fallbackChatForId = chatId => chatId === DEMO_TEST_CHAT.id ? DEMO_TEST_CHAT : missingChatForId(chatId);
+const fallbackChatForId = chatId => missingChatForId(chatId);
 
 export function ChatList({ onOpen, role, availableRoles, onSwitchRole, properties = [], demoUsers = [] }) {
   const demoUser = getDemoUser(demoUsers.length ? demoUsers : undefined);

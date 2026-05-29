@@ -1,8 +1,6 @@
 -- 예전 더미 채팅 메시지와 삭제된 매물에 연결된 채팅 컨텍스트를 정리한다.
 
 with valid_threads as (
-  select 'demo-test-chat'::text as thread_id
-  union
   select 'listing-' || listings.id::text || '-' || demo_users.id
   from public.listings
   cross join public.demo_users

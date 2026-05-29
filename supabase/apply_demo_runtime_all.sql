@@ -1015,8 +1015,6 @@ where direct_buyer_proposals.listing_id = listings.demo_listing_id
 -- ?덉쟾 ?붾? 梨꾪똿 硫붿떆吏? ??젣??留ㅻЪ???곌껐??梨꾪똿 而⑦뀓?ㅽ듃瑜??뺣━?쒕떎.
 
 with valid_threads as (
-  select 'demo-test-chat'::text as thread_id
-  union
   select 'listing-' || listings.id::text || '-' || demo_users.id
   from public.listings
   cross join public.demo_users
@@ -1063,6 +1061,36 @@ set
          or listings.demo_listing_id = context->'listing'->>'demoListingId'
          or listings.demo_listing_id = context->'listing'->>'demo_listing_id'
     )
+  ), '[]'::jsonb),
+  updated_at = now()
+where state_key = 'toad.chatContexts'
+  and jsonb_typeof(payload) = 'array';
+
+-- ============================================================
+-- supabase\migrations\202605290010_remove_demo_test_chat.sql
+-- ============================================================
+-- 怨듭슜 ?뚯뒪??梨꾪똿諛??곗씠?곕? ?쒓굅?쒕떎.
+
+delete from public.chat_messages
+where thread_id = 'demo-test-chat';
+
+update public.chats
+set
+  payload = coalesce((
+    select jsonb_agg(context)
+    from jsonb_array_elements(payload) as context
+    where context->>'id' <> 'demo-test-chat'
+  ), '[]'::jsonb),
+  updated_at = now()
+where state_key = 'toad.chatContexts'
+  and jsonb_typeof(payload) = 'array';
+
+update public.demo_app_state
+set
+  payload = coalesce((
+    select jsonb_agg(context)
+    from jsonb_array_elements(payload) as context
+    where context->>'id' <> 'demo-test-chat'
   ), '[]'::jsonb),
   updated_at = now()
 where state_key = 'toad.chatContexts'

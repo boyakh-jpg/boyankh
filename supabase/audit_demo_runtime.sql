@@ -177,8 +177,6 @@ union all
 select 'legacy_chat_messages', jsonb_build_object(
   'invalid_thread_count', (
     with valid_threads as (
-      select 'demo-test-chat'::text as thread_id
-      union
       select 'listing-' || listings.id::text || '-' || demo_users.id
       from public.listings
       cross join public.demo_users
@@ -199,8 +197,6 @@ select 'legacy_chat_messages', jsonb_build_object(
   ),
   'invalid_thread_ids', (
     with valid_threads as (
-      select 'demo-test-chat'::text as thread_id
-      union
       select 'listing-' || listings.id::text || '-' || demo_users.id
       from public.listings
       cross join public.demo_users
