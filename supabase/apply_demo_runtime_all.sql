@@ -1331,7 +1331,7 @@ with listing_seed as (
 update public.listings as listings
 set
   title = listing_seed.region || ' ' || listing_seed.dong || ' ' || listing_seed.complex,
-  address = '서울 ' || listing_seed.region || ' ' || listing_seed.dong || ' ' || listing_seed.complex,
+  address = '서울특별시 ' || listing_seed.region || ' ' || listing_seed.dong || ' ' || listing_seed.complex,
   region = listing_seed.region,
   dong = listing_seed.dong,
   complex = listing_seed.complex
@@ -1355,7 +1355,7 @@ with office_seed as (
 update public.broker_offices as offices
 set
   office_name = office_seed.region || ' 토드공인중개사 ' || lpad(office_seed.g::text, 2, '0'),
-  address = '서울 ' || office_seed.region || ' ' || office_seed.dong || ' ' || (100 + office_seed.g),
+  address = '서울특별시 ' || office_seed.region || ' ' || office_seed.dong || ' ' || (100 + office_seed.g),
   region = office_seed.region,
   specialty_regions = array[office_seed.region],
   tier = case
@@ -1387,3 +1387,15 @@ set listing_title = listings.region || ' ' || listings.dong || ' ' || listings.c
 from public.listings as listings
 where proposals.listing_id = listings.demo_listing_id
   and listings.demo_listing_id like 'listing-%';
+
+-- supabase\migrations\202606010004_expand_seoul_addresses.sql
+-- Expand Seoul demo display addresses while keeping region filters as district names.
+
+update public.listings
+set address = regexp_replace(address, '^서울 ', '서울특별시 ')
+where owner_key like 'owner-%'
+  and address like '서울 %';
+
+update public.broker_offices
+set address = regexp_replace(address, '^서울 ', '서울특별시 ')
+where address like '서울 %';

@@ -12,7 +12,7 @@ with listing_seed as (
 update public.listings as listings
 set
   title = listing_seed.region || ' ' || listing_seed.dong || ' ' || listing_seed.complex,
-  address = '서울 ' || listing_seed.region || ' ' || listing_seed.dong || ' ' || listing_seed.complex,
+  address = '서울특별시 ' || listing_seed.region || ' ' || listing_seed.dong || ' ' || listing_seed.complex,
   region = listing_seed.region,
   dong = listing_seed.dong,
   complex = listing_seed.complex
@@ -36,7 +36,7 @@ with office_seed as (
 update public.broker_offices as offices
 set
   office_name = office_seed.region || ' 토드공인중개사 ' || lpad(office_seed.g::text, 2, '0'),
-  address = '서울 ' || office_seed.region || ' ' || office_seed.dong || ' ' || (100 + office_seed.g),
+  address = '서울특별시 ' || office_seed.region || ' ' || office_seed.dong || ' ' || (100 + office_seed.g),
   region = office_seed.region,
   specialty_regions = array[office_seed.region],
   tier = case

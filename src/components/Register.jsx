@@ -5,6 +5,25 @@ import { PROPERTY_TYPE_GROUPS, REGISTER_DEAL_OPTIONS_BY_PROP, RIGHTS_PROP_TYPES,
 
 const POSTCODE_SCRIPT_URL = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
 const getPostcode = () => window.daum?.Postcode || window.kakao?.Postcode;
+const SIDO_LABELS = {
+  서울: "서울특별시",
+  부산: "부산광역시",
+  대구: "대구광역시",
+  인천: "인천광역시",
+  광주: "광주광역시",
+  대전: "대전광역시",
+  울산: "울산광역시",
+  세종: "세종특별자치시",
+  경기: "경기도",
+  강원: "강원특별자치도",
+  충북: "충청북도",
+  충남: "충청남도",
+  전북: "전북특별자치도",
+  전남: "전라남도",
+  경북: "경상북도",
+  경남: "경상남도",
+  제주: "제주특별자치도",
+};
 const loadPostcodeScript = () => new Promise((resolve, reject) => {
   if (typeof window === "undefined") return reject(new Error("window unavailable"));
   if (getPostcode()) return resolve(getPostcode());
@@ -22,14 +41,22 @@ const loadPostcodeScript = () => new Promise((resolve, reject) => {
   document.head.appendChild(script);
 });
 
+const normalizeSido = value => SIDO_LABELS[value] || value || "";
+const pickCity = data => normalizeSido(data.sido || (data.address || data.roadAddress || data.jibunAddress || "").split(" ")[0] || "");
 const pickRegion = data => data.sigungu || (data.address || data.roadAddress || data.jibunAddress || "").match(/(\S+(구|시|군))/)?.[1] || "";
 const pickDong = data => data.bname || (data.jibunAddress || data.address || "").match(/(\S+(동|읍|면|가))/)?.[1] || "";
 const pickComplex = data => data.buildingName || (data.apartment === "Y" ? data.roadname : "") || "";
+const fullAddress = (base, detail) => [base, detail].filter(Boolean).join(" ");
+const expandSidoInAddress = (address, city) => {
+  if (!address || !city) return address || "";
+  const shortCity = Object.keys(SIDO_LABELS).find(key => SIDO_LABELS[key] === city);
+  return shortCity && address.startsWith(`${shortCity} `) ? address.replace(shortCity, city) : address;
+};
 
 export function Register({ onDone, onClose, onBack }) {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
-  const [d, setD] = useState({ propType:"", dealType:"", deposit:"", monthly:"", premium:"", address:"", zonecode:"", roadAddress:"", jibunAddress:"", region:"", dong:"", complex:"", supplyArea:"", exclusiveArea:"", area:"", floor:"", totalFloor:"", roomCount:"", bathCount:"", direction:"", duplex:"", moveInDate:"", loan:"", maintenance:"", parking:"", special:"", description:"", tenant:"", tenantEnd:"", tenantDeposit:"", tenantMonthly:"", tenantMemo:"", feeRate:0.4, fastMode:null, directMode:false, certified:false });
+  const [d, setD] = useState({ propType:"", dealType:"", deposit:"", monthly:"", premium:"", address:"", detailAddress:"", zonecode:"", roadAddress:"", jibunAddress:"", city:"", region:"", dong:"", complex:"", supplyArea:"", exclusiveArea:"", area:"", floor:"", totalFloor:"", roomCount:"", bathCount:"", direction:"", duplex:"", moveInDate:"", loan:"", maintenance:"", parking:"", special:"", description:"", tenant:"", tenantEnd:"", tenantDeposit:"", tenantMonthly:"", tenantMemo:"", feeRate:0.4, fastMode:null, directMode:false, certified:false });
   const [cs, setCs] = useState(0);
   const [code, setCode] = useState("");
   const [addressError, setAddressError] = useState("");
@@ -57,13 +84,16 @@ export function Register({ onDone, onClose, onBack }) {
       const Postcode = await loadPostcodeScript();
       new Postcode({
         oncomplete: data => {
-          const baseAddress = data.roadAddress || data.jibunAddress || data.address || "";
+          const city = pickCity(data);
+          const baseAddress = expandSidoInAddress(data.roadAddress || data.jibunAddress || data.address || "", city);
           setD(p => ({
             ...p,
             address: baseAddress,
+            detailAddress: "",
             zonecode: data.zonecode || "",
             roadAddress: data.roadAddress || "",
             jibunAddress: data.jibunAddress || "",
+            city,
             region: pickRegion(data),
             dong: pickDong(data),
             complex: pickComplex(data),
@@ -73,19 +103,6 @@ export function Register({ onDone, onClose, onBack }) {
     } catch {
       setAddressError("주소검색을 불러오지 못했어요. 직접 입력해 주세요.");
     }
-  };
-  const setAddressText = value => {
-    setAddressError("");
-    setD(p => ({
-      ...p,
-      address: value,
-      zonecode: "",
-      roadAddress: "",
-      jibunAddress: "",
-      region: "",
-      dong: "",
-      complex: "",
-    }));
   };
   // 만원 단위 숫자 → "12억 5,000만원" 형태
   const formatMan = man => {
@@ -132,7 +149,8 @@ export function Register({ onDone, onClose, onBack }) {
     return {
       id: "u" + Date.now(),
       region: regionMatch, dong: dongMatch,
-      address: d.address,
+      address: fullAddress(d.address, d.detailAddress),
+      detailAddress: d.detailAddress,
       zonecode: d.zonecode,
       roadAddress: d.roadAddress,
       jibunAddress: d.jibunAddress,
@@ -178,7 +196,7 @@ export function Register({ onDone, onClose, onBack }) {
   }, [step]);
   const moods = ["calm","pondering","determined","pondering","pondering","pondering","calm","pondering","determined","calm","excited"];
   const titles = ["어떤 매물인가요?","어떤 거래를 원하세요?","희망 금액을 입력하세요","매물 주소를 알려주세요","세부 정보를 입력해 주세요","임차인이 있나요?","사진을 등록해 주세요","수수료 상한을 설정하세요","의뢰 방식을 골라주세요","소유자 인증","등록 완료!"];
-  const subs = ["누르면 바로 넘어가요","누르면 바로 넘어가요","수수료 계산의 기준이 돼요","도로명 또는 지번","중개사들이 궁금해해요","정확할수록 빠른 거래","많을수록 문의가 늘어요","높을수록 적극적으로","소유주가 직접 선택","허위매물 방지 필수","전국 중개사에게 발송!"];
+  const subs = ["누르면 바로 넘어가요","누르면 바로 넘어가요","수수료 계산의 기준이 돼요","주소 찾기 후 상세주소","중개사들이 궁금해해요","정확할수록 빠른 거래","많을수록 문의가 늘어요","높을수록 적극적으로","소유주가 직접 선택","허위매물 방지 필수","전국 중개사에게 발송!"];
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: G.pageBg }}>
       <div style={{ padding: "46px 20px 8px", flexShrink: 0 }}>
@@ -303,12 +321,13 @@ export function Register({ onDone, onClose, onBack }) {
           {step === 3 && (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginBottom: 8 }}>
-                <input placeholder="주소 검색 버튼으로 선택" value={d.address} onChange={e => setAddressText(e.target.value)} autoFocus style={{ width: "100%", padding: 16, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
+                <input placeholder="주소 찾기로 선택" value={d.address} readOnly autoFocus style={{ width: "100%", padding: 16, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#f8faf7", color: d.address ? C.dark : C.gray, cursor: "default" }}/>
                 <button onClick={openAddressSearch} style={{ border: "none", background: G.header, color: "#fff", borderRadius: 16, padding: "0 14px", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>주소 찾기</button>
               </div>
+              <input placeholder="상세주소 (동/호수, 층, 참고사항)" value={d.detailAddress} onChange={e => set("detailAddress", e.target.value)} style={{ width: "100%", padding: 14, borderRadius: 14, border: `1.5px solid ${C.line}`, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 10, background: "#fff" }}/>
               {(d.region || d.dong || d.complex || d.zonecode) && (
                 <div style={{ background: G.greenSoft, borderRadius: 14, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: C.greenInk, fontWeight: 800, lineHeight: 1.5 }}>
-                  {d.zonecode && <span>{d.zonecode} · </span>}{d.region || "지역 미분류"} {d.dong || ""}{d.complex ? ` · ${d.complex}` : ""}
+                  {d.zonecode && <span>{d.zonecode} · </span>}{[d.city, d.region, d.dong].filter(Boolean).join(" ") || "지역 미분류"}{d.complex ? ` · ${d.complex}` : ""}
                 </div>
               )}
               {addressError && <div style={{ fontSize: 11, color: C.goldInk, margin: "0 0 10px 2px" }}>{addressError}</div>}

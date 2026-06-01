@@ -117,12 +117,23 @@ select 'listing_address_quality', jsonb_build_object(
         or coalesce(complex, '') ~ '[A-Za-z]'
       )
   ),
+  'short_seoul_listing_addresses', (
+    select count(*)
+    from public.listings
+    where owner_key like 'owner-%'
+      and address like '서울 %'
+  ),
   'english_broker_addresses', (
     select count(*)
     from public.broker_offices
     where coalesce(address, '') ~ '[A-Za-z]'
       or coalesce(region, '') ~ '[A-Za-z]'
       or coalesce(office_name, '') ~ '[A-Za-z]'
+  ),
+  'short_seoul_broker_addresses', (
+    select count(*)
+    from public.broker_offices
+    where address like '서울 %'
   ),
   'listings_missing_address_parts', (
     select count(*)
