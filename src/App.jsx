@@ -558,7 +558,7 @@ export default function App() {
           {["splash", "login", "role"].includes(screen) ? (
             <span style={{ width: 30 }}/>
           ) : screen === "settings" ? (
-            <span style={{ width: 30, height: 30, borderRadius: 15, border: "1px solid #ffffff55", background: "#ffffff2e", color: "#fff", fontSize: 17, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, transform: "translateY(7px)" }}><span style={{ display: "block", transform: "translateY(-1px)" }}>⚙</span></span>
+            <span style={{ width: 30 }}/>
           ) : (
             <button onClick={openSettings} aria-label="설정" style={{ pointerEvents: "auto", width: 30, height: 30, borderRadius: 15, border: "1px solid #ffffff55", background: "#ffffff2e", color: "#fff", fontSize: 17, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0, transform: "translateY(7px)" }}><span style={{ display: "block", transform: "translateY(-1px)" }}>⚙</span></button>
           )}

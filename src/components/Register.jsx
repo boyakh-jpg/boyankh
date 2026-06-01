@@ -327,7 +327,7 @@ export function Register({ onDone, onClose, onBack }) {
               <input placeholder="상세주소 (동/호수, 층, 참고사항)" value={d.detailAddress} onChange={e => set("detailAddress", e.target.value)} style={{ width: "100%", padding: 14, borderRadius: 14, border: `1.5px solid ${C.line}`, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 10, background: "#fff" }}/>
               {(d.region || d.dong || d.complex || d.zonecode) && (
                 <div style={{ background: G.greenSoft, borderRadius: 14, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: C.greenInk, fontWeight: 800, lineHeight: 1.5 }}>
-                  {d.zonecode && <span>{d.zonecode} · </span>}{[d.city, d.region, d.dong].filter(Boolean).join(" ") || "지역 미분류"}{d.complex ? ` · ${d.complex}` : ""}
+                  {d.zonecode && <span>{d.zonecode} · </span>}{[d.city, d.region, d.dong].filter(Boolean).join(" ") || "지역 미분류"}
                 </div>
               )}
               {addressError && <div style={{ fontSize: 11, color: C.goldInk, margin: "0 0 10px 2px" }}>{addressError}</div>}

@@ -230,13 +230,17 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   const leaseBadge = p => p.dealType === "매매" && p.tenant === "있어요" ? (Number(p.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
   const ownerPhoneFor = p => p.ownerPhone || p.owner_phone || "연락처 미등록";
   const ownerLabelFor = p => p.ownerLabel || p.ownerName || (String(p.ownerKey || "").startsWith("owner-") ? `소유주 ${String(p.ownerKey).replace("owner-", "")}` : p.ownerKey) || "소유주 미지정";
+  const openChatFromDetail = listing => {
+    setSelected(null);
+    onOpenChat && onOpenChat(listing);
+  };
   const ContactOpenBox = ({ listing }) => (
     <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 900 }}>소유주 연락처</span>
         <span style={{ fontSize: 15, color: C.dark, fontWeight: 900 }}>{ownerPhoneFor(listing)}</span>
       </div>
-      <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "11px 0", background: "#fff", border: `1.5px solid ${C.gold}`, borderRadius: 12, color: C.goldInk, fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>채팅 걸기</button>
+      <button onClick={() => openChatFromDetail(listing)} style={{ width: "100%", padding: "11px 0", background: "#fff", border: `1.5px solid ${C.gold}`, borderRadius: 12, color: C.goldInk, fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>채팅 걸기</button>
     </div>
   );
   const openPay = p => {
@@ -338,7 +342,7 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
           ) : open ? (
             <ContactOpenBox listing={listing}/>
           ) : requested ? (
-            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>채팅방 열기 · 승인 대기</button>
+            <button onClick={() => openChatFromDetail(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>채팅방 열기 · 승인 대기</button>
           ) : (
             <button onClick={() => { setSelected(null); openPay(listing); }} style={{ width: "100%", padding: "14px 0", background: listing.fast ? G.gold : G.header, border: "none", borderRadius: 14, color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 열람 (10,000P)" : "연락처 공개 요청 (10,000P)"}</button>
           )}

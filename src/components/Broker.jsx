@@ -252,13 +252,17 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
   const leaseBadge = l => l.dealType === "매매" && l.tenant === "있어요" ? (Number(l.tenantMonthly) > 0 ? "임대 승계" : "전세 승계") : null;
   const ownerPhoneFor = l => l.ownerPhone || l.owner_phone || "연락처 미등록";
   const ownerLabelFor = l => l.ownerLabel || l.ownerName || (String(l.ownerKey || "").startsWith("owner-") ? `소유주 ${String(l.ownerKey).replace("owner-", "")}` : l.ownerKey) || "소유주 미지정";
+  const openChatFromDetail = listing => {
+    setSelected(null);
+    onOpenChat && onOpenChat(listing);
+  };
   const ContactOpenBox = ({ listing }) => (
     <div onClick={e => e.stopPropagation()} style={{ background: G.goldSoft, border: `1.5px solid ${C.gold}`, borderRadius: 14, padding: 13, display: "grid", gap: 8, boxShadow: SH2 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 12, color: C.goldInk, fontWeight: 900 }}>소유주 연락처</span>
         <span style={{ fontSize: 15, color: C.dark, fontWeight: 900 }}>{ownerPhoneFor(listing)}</span>
       </div>
-      <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "11px 0", background: "#fff", border: `1.5px solid ${C.gold}`, borderRadius: 12, color: C.goldInk, fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>채팅하기</button>
+      <button onClick={() => openChatFromDetail(listing)} style={{ width: "100%", padding: "11px 0", background: "#fff", border: `1.5px solid ${C.gold}`, borderRadius: 12, color: C.goldInk, fontWeight: 900, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>채팅하기</button>
     </div>
   );
   const DetailSheet = ({ listing }) => {
@@ -336,7 +340,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
           ) : contactOpen(listing) ? (
             <ContactOpenBox listing={listing}/>
           ) : contacted[listing.id] ? (
-            <button onClick={() => onOpenChat && onOpenChat(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 확인 완료 · 채팅하기" : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
+            <button onClick={() => openChatFromDetail(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 확인 완료 · 채팅하기" : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
           ) : (
             <button onClick={() => { if (listing.fast) handleFast(listing); else { setSelected(null); openApply(listing); } }} style={{ width: "100%", padding: "14px 0", background: insufficient ? "#D5DDD7" : (listing.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (listing.fast ? `연락처 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
           )}
