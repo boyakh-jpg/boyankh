@@ -3,6 +3,7 @@ import { C, G, SH1, SH2, spring } from "../theme";
 import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP, PROPERTY_TYPE_GROUPS } from "../data/data";
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Frog, Tag } from "./common";
+import { PropertyMap } from "./PropertyMap";
 import { getDemoUser } from "../data/demoUsers";
 import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
 
@@ -72,6 +73,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   const [activeId, setActiveId] = useState(null);
   const [selected, setSelected] = useState(null);
   const [listMode, setListMode] = useState(menuMode);
+  const [viewMode, setViewMode] = useState("list");
   const [filterOpen, setFilterOpen] = useState(menuMode !== "viewed");
   const [appliedFilters, setAppliedFilters] = useState({ regionGroup, region, dong, ptypes, dealTypes, priceMin, priceMax, sort, statusFilter, hideViewed, listMode });
   const [favorites, setFavorites] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerFavorites"));
@@ -437,7 +439,15 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
         </div>
       </div>
       <div style={{ padding: "16px 16px 0" }}>
-        {(!isViewedMenu || filterOpen) && <MiniMap items={list} activeId={activePin} onPick={pickPin} tone="gold"/>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+          {[
+            ["list", "목록"],
+            ["map", "지도"],
+          ].map(([key, label]) => (
+            <button key={key} onClick={() => setViewMode(key)} style={{ border: `1.5px solid ${viewMode === key ? C.gold : C.line}`, background: viewMode === key ? G.goldSoft : "#fff", color: viewMode === key ? C.goldInk : C.mid, borderRadius: 14, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+          ))}
+        </div>
+        {viewMode === "list" && (!isViewedMenu || filterOpen) && <MiniMap items={list} activeId={activePin} onPick={pickPin} tone="gold"/>}
         {isViewedMenu && (
           <button onClick={() => setFilterOpen(v => !v)} style={{ border: "none", background: "transparent", color: C.goldInk, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", padding: "0 2px 8px", marginTop: -2 }}>{filterOpen ? "필터창 숨기기" : "필터창 보이기"}</button>
         )}
@@ -532,7 +542,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
           <div style={{ fontSize: 13, color: C.gray }}>총 {visibleList.length}건{activePin && <span> · 핀 선택됨</span>}</div>
           {!isViewedMenu && (hasFilter || hasPendingFilters) && <button onClick={resetFilters} style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.goldInk, borderRadius: 12, padding: "6px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>필터 해제</button>}
         </div>
-        {visibleList.map(Card)}
+        {viewMode === "map" ? <PropertyMap embedded tone="gold" allowedListings={visibleList}/> : visibleList.map(Card)}
         <div style={{ height: 64 }}/>
       </div>
     </div>

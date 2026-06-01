@@ -5,7 +5,7 @@ import { supabase } from "../supabaseClient";
 
 const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
 const MAP_CLIENT_ID = import.meta.env.VITE_NAVER_MAPS_CLIENT_ID;
-const LISTING_COLUMNS = "id,title,price,address,region,dong,complex,prop_type,deal_type,price_label,price_num,lat,lng,created_at,status";
+const LISTING_COLUMNS = "id,title,price,address,region,dong,complex,prop_type,deal_type,price_label,price_num,lat,lng,created_at,status,demo_listing_id";
 
 const loadNaverMap = () => new Promise((resolve, reject) => {
   if (typeof window === "undefined") return reject(new Error("window unavailable"));
@@ -57,7 +57,12 @@ const listingFromRow = row => ({
   priceNum: row.price_num || row.price || 0,
   lat: Number(row.lat),
   lng: Number(row.lng),
+  demoListingId: row.demo_listing_id || null,
 });
+
+const listingIds = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id]
+  .filter(value => value !== undefined && value !== null && value !== "")
+  .map(String);
 
 async function fetchListingsInBounds(bounds) {
   if (!bounds || [bounds.south, bounds.north, bounds.west, bounds.east].some(v => !Number.isFinite(Number(v)))) return [];
@@ -78,7 +83,7 @@ async function fetchListingsInBounds(bounds) {
   return (data || []).map(listingFromRow).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
 }
 
-export function PropertyMap({ role, availableRoles, onSwitchRole }) {
+export function PropertyMap({ role, availableRoles, onSwitchRole, embedded = false, tone = "green", allowedListings = null }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -86,6 +91,10 @@ export function PropertyMap({ role, availableRoles, onSwitchRole }) {
   const [readyError, setReadyError] = useState("");
   const [listings, setListings] = useState([]);
   const [selected, setSelected] = useState(null);
+  const allowedIdSet = allowedListings ? new Set(allowedListings.flatMap(listingIds)) : null;
+  const allowedKey = allowedIdSet ? [...allowedIdSet].sort().join("|") : "all";
+  const accent = tone === "gold" ? C.gold : C.green;
+  const accentInk = tone === "gold" ? C.goldInk : C.greenInk;
 
   useEffect(() => {
     let alive = true;
@@ -101,8 +110,9 @@ export function PropertyMap({ role, availableRoles, onSwitchRole }) {
         const refresh = () => {
           clearTimeout(idleTimer.current);
           idleTimer.current = setTimeout(async () => {
-            const next = await fetchListingsInBounds(boundsFromMap(map));
+            const rows = await fetchListingsInBounds(boundsFromMap(map));
             if (!alive) return;
+            const next = allowedIdSet ? rows.filter(listing => listingIds(listing).some(id => allowedIdSet.has(id))) : rows;
             setListings(next);
             markersRef.current.forEach(marker => marker.setMap(null));
             markersRef.current = next.map(listing => {
@@ -126,11 +136,11 @@ export function PropertyMap({ role, availableRoles, onSwitchRole }) {
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
     };
-  }, []);
+  }, [allowedKey]);
 
   return (
-    <div style={{ height: "100%", background: G.pageBg, display: "flex", flexDirection: "column" }}>
-      <div style={{ background: G.header, padding: "46px 20px 18px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)", flexShrink: 0 }}>
+    <div style={{ height: embedded ? 520 : "100%", background: embedded ? "#fff" : G.pageBg, display: "flex", flexDirection: "column", borderRadius: embedded ? 18 : 0, overflow: "hidden", boxShadow: embedded ? SH1 : "none", marginBottom: embedded ? 12 : 0 }}>
+      {!embedded && <div style={{ background: G.header, padding: "46px 20px 18px", borderRadius: "0 0 30px 30px", boxShadow: "0 8px 24px rgba(111,184,148,.25)", flexShrink: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
           <div>
             <div style={{ color: "#fff", fontSize: 22, fontWeight: 900 }}>지도</div>
@@ -141,9 +151,14 @@ export function PropertyMap({ role, availableRoles, onSwitchRole }) {
             <Frog mood="calm" size={58}/>
           </div>
         </div>
-      </div>
+      </div>}
       <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
         <div ref={mapEl} style={{ position: "absolute", inset: 0, background: "#E8EFEA" }}/>
+        {embedded && (
+          <div style={{ position: "absolute", left: 12, top: 12, background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: "7px 11px", color: accentInk, fontSize: 12, fontWeight: 900, boxShadow: SH1, zIndex: 1 }}>
+            지도 안 매물 {listings.length}건
+          </div>
+        )}
         {readyError && (
           <div style={{ position: "absolute", left: 16, right: 16, top: 18, background: "#fff", borderRadius: 16, padding: 16, boxShadow: SH1, color: C.mid, fontSize: 13, lineHeight: 1.6 }}>
             {readyError}
@@ -163,6 +178,7 @@ export function PropertyMap({ role, availableRoles, onSwitchRole }) {
               <Tag tone="gold">{selected.dealType}</Tag>
             </div>
             <div style={{ fontSize: 22, fontWeight: 900, color: C.dark }}>{selected.price}</div>
+            <div style={{ width: 42, height: 4, background: accent, borderRadius: 999, marginTop: 10 }}/>
           </div>
         )}
       </div>

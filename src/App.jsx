@@ -7,7 +7,6 @@ import { Home } from "./components/Home";
 import { Broker } from "./components/Broker";
 import { BrokerOffices } from "./components/BrokerOffices";
 import { BuyerExplore } from "./components/BuyerExplore";
-import { PropertyMap } from "./components/PropertyMap";
 import { ChatList, ChatRoom } from "./components/Chat";
 import { Subscription } from "./components/Subscription";
 import { MyList } from "./components/MyList";
@@ -604,8 +603,7 @@ export default function App() {
   const ownerMenus = [{ k: "home", label: "홈" }, { k: "register", label: "의뢰하기" }, { k: "offices", label: "부동산" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }, { k: "mylist", label: "내 매물" }];
   const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }];
   const buyerMenus = [{ k: "home", label: "홈" }, { k: "buyer", label: "매물" }, { k: "buyerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }];
-  const addMapMenu = list => list.some(item => item.k === "map") ? list : [...list.slice(0, 2), { k: "map", label: "지도" }, ...list.slice(2)];
-  const menus = addMapMenu(role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus);
+  const menus = role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus;
   const roleLabel = { owner: "소유주", broker: "중개사", buyer: "직거래" };
   const nextRole = availableRoles[(availableRoles.indexOf(role) + 1) % availableRoles.length] || availableRoles[0];
   const noMenu = ["splash", "login", "role", "register", "chatroom"].includes(screen);
@@ -637,7 +635,6 @@ export default function App() {
           {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
           {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
-          {screen === "map" && <PropertyMap role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
           {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} onRecordProposal={recordBrokerProposal} openModal={setModal}/>}
