@@ -55,7 +55,7 @@ export function MyList({ properties = [], preset = {}, viewerKey = "toad-demo-ow
     name: item.name || item.brokerName || "중개사",
     office: item.office || item.officeName || "",
     when: item.when || "방금",
-    sec: item.activityType === "안심의뢰" ? 120 : 35,
+    sec: item.viewSeconds || (item.activityType === "안심의뢰" ? 120 : 35),
   }));
   // 공용 store에서 내가 등록한 매물 → MyList 표시 형식으로 정규화
   const mine = properties.filter(p => p.mine).map(p => ({

@@ -15,7 +15,7 @@ import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { DEMO_USERS, getDemoUser } from "./data/demoUsers";
-import { CACHE_KEYS, chatReadStateKey, countUnreadChatMessages, loadBackendState, loadCache, loadChatContextsForUser, loadListingContracts, loadLocalState, markChatThreadRead, saveBackendState, saveChatContext, saveListingContract, syncCache, syncChatContexts } from "./data/cache";
+import { CACHE_KEYS, chatReadStateKey, countUnreadChatMessages, loadBackendState, loadCache, loadChatContextsForUser, loadListingContracts, loadLocalState, markChatThreadRead, saveBackendState, saveCache, saveChatContext, saveListingContract, syncCache, syncChatContexts } from "./data/cache";
 import { loadDemoEnvironment } from "./data/supabaseData";
 
 const loadSetting = (key, fallback) => {
@@ -237,8 +237,10 @@ export default function App() {
       const nextDemoUsers = env.demoUsers.length ? env.demoUsers : DEMO_USERS;
       setDemoUsers(nextDemoUsers);
       setBrokerOffices(env.brokerOffices.length ? env.brokerOffices : BROKER_OFFICES);
-      setBrokerProposals(env.brokerProposals);
-      setDirectBuyerProposals(env.directBuyerProposals);
+      const cachedBrokerProposals = loadCache(CACHE_KEYS.brokerProposals, []);
+      const cachedBuyerProposals = loadCache(CACHE_KEYS.buyerProposals, []);
+      setBrokerProposals([...(Array.isArray(cachedBrokerProposals) ? cachedBrokerProposals : []), ...env.brokerProposals]);
+      setDirectBuyerProposals([...(Array.isArray(cachedBuyerProposals) ? cachedBuyerProposals : []), ...env.directBuyerProposals]);
       setDemoUser(getDemoUser(nextDemoUsers));
     });
     return () => { alive = false; };
@@ -467,6 +469,38 @@ export default function App() {
       buyerName: item.name || "직거래 매수자",
     });
   };
+  const recordBrokerProposal = ({ listing, activityType, viewSeconds = 1 }) => {
+    if (!listing) return;
+    const listingId = listing.demoListingId || listing.demo_listing_id || listing.id;
+    const requestId = `broker-${listingId}-${demoUser.id}`;
+    const nextItem = {
+      id: requestId,
+      ownerKey: listing.ownerKey || listing.owner_key || null,
+      listingId,
+      brokerOfficeId: demoUser.id,
+      brokerUserId: demoUser.id,
+      brokerKey: demoUser.id,
+      brokerName: demoUser.label,
+      name: demoUser.label,
+      office: "중개사 계정",
+      deals: 0,
+      msg: "",
+      activityType,
+      proposalNew: true,
+      requestId,
+      chatId: `listing-${listing.id}-${demoUser.id}`,
+      listingTitle: `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim(),
+      when: "방금",
+      viewSeconds,
+    };
+    setBrokerProposals(current => {
+      const rest = current.filter(item => item.requestId !== requestId && item.chatId !== nextItem.chatId);
+      const previous = current.find(item => item.requestId === requestId || item.chatId === nextItem.chatId);
+      const next = [{ ...previous, ...nextItem, viewSeconds: Math.max(previous?.viewSeconds || 0, viewSeconds) }, ...rest];
+      saveCache(CACHE_KEYS.brokerProposals, next.filter(item => String(item.id || "").startsWith("broker-")));
+      return next;
+    });
+  };
   const openBrokerListingChat = listing => openChat({
     id: `listing-${listing.id}-${demoUser.id}`,
     listing: listingWithOwner(listing),
@@ -598,7 +632,7 @@ export default function App() {
           {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
           {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>}
+          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} onRecordProposal={recordBrokerProposal} openModal={setModal}/>}
           {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
           {screen === "direct" && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
           {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onBack={() => setScreen(settingsBack)}/>}

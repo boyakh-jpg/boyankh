@@ -52,7 +52,7 @@ function MultiFilter({ label, options, values, onToggle, tone = "green", groups 
 }
 
 const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.includes(v));
-export function Broker({ properties = PROPERTIES, brokerProposals = [], preset = {}, menuMode = "all", role, availableRoles, tier = "골드", onSwitchRole, onOpenChat, openModal }) {
+export function Broker({ properties = PROPERTIES, brokerProposals = [], preset = {}, menuMode = "all", role, availableRoles, tier = "골드", onSwitchRole, onOpenChat, onRecordProposal, openModal }) {
   const demoUser = getDemoUser();
   const pointDefault = getDefaultPointBalance(demoUser.role);
   const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
@@ -76,6 +76,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
   const [notes, setNotes] = useState({});        // 매물별 메모 {id: text}
   const [activeId, setActiveId] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [detailOpenedAt, setDetailOpenedAt] = useState(null);
   const [listMode, setListMode] = useState(menuMode);
   const [filterOpen, setFilterOpen] = useState(menuMode !== "viewed");
   const [appliedFilters, setAppliedFilters] = useState({ regionGroup, region, dong, ptypes, dealTypes, sort, statusFilter, hideViewed, listMode });
@@ -170,6 +171,15 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
     showToast("포인트가 부족해요 · 충전 후 이용 가능");
     return true;
   };
+  const openDetail = id => {
+    setSelected(id);
+    setDetailOpenedAt(Date.now());
+  };
+  const closeDetail = () => {
+    setSelected(null);
+    setDetailOpenedAt(null);
+  };
+  const currentViewSeconds = () => detailOpenedAt ? Math.max(1, Math.round((Date.now() - detailOpenedAt) / 1000)) : 1;
   const handleFast = l => {
     if (isTermExpired(l)) {
       showToast("매물 의뢰가 만료됐어요 · 연락처 조회 불가");
@@ -179,15 +189,16 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
     updatePoints(p => p - tierCost.fast, "broker_fast_contact");
     markContacted(l.id);
     markViewed(l.id);
+    onRecordProposal?.({ listing: l, activityType: "빠른의뢰", viewSeconds: currentViewSeconds() });
     showToast(`연락처 확인 완료 · ${tierCost.fast.toLocaleString()}P 차감`);
   };
-  const openApply = l => {
+  const openApply = (l, viewSeconds = currentViewSeconds()) => {
     if (isTermExpired(l)) {
       showToast("매물 의뢰가 만료됐어요 · 중개 의뢰 불가");
       return;
     }
     if (needPoints(tierCost.safe)) return;
-    openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { updatePoints(p => p - tierCost.safe, "broker_safe_request"); markContacted(l.id); markSafeRequest(l.id, "pending"); markViewed(l.id); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
+    openModal({ type: "apply", payload: { ...l, addr: `${l.region} ${l.dong} ${l.complex}` }, defaultMsg, cost: tierCost.safe, onConfirm: () => { updatePoints(p => p - tierCost.safe, "broker_safe_request"); markContacted(l.id); markSafeRequest(l.id, "pending"); markViewed(l.id); onRecordProposal?.({ listing: l, activityType: "안심의뢰", viewSeconds }); showToast(`안심의뢰 전송 · ${tierCost.safe.toLocaleString()}P 선차감 · 거절/무응답 환불`); } });
   };
   const openEdit = () => openModal({ type: "editMsg", payload: defaultMsg, onConfirm: m => { setDefaultMsg(m); showToast("기본 메시지 저장됨"); } });
   useEffect(() => {
@@ -289,7 +300,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
     const badge = leaseBadge(listing);
     const favorite = !!favorites[listing.id];
     return (
-      <div onClick={() => setSelected(null)} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
+      <div onClick={closeDetail} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
         <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "86%", overflowY: "auto", background: G.pageBg, borderRadius: "26px 26px 0 0", padding: "20px 18px 108px", boxSizing: "border-box", animation: "sheetUp .3s " + spring }}>
           <div style={{ width: 40, height: 4, borderRadius: 2, background: C.line, margin: "0 auto 16px" }}/>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
@@ -305,7 +316,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button onClick={() => toggleFavorite(listing.id)} style={{ width: 30, height: 30, borderRadius: 15, border: `1px solid ${favorite ? C.gold : C.line}`, background: favorite ? G.goldSoft : "#fff", color: favorite ? C.goldInk : C.gray, fontSize: 16, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}>{favorite ? "★" : "☆"}</button>
-              <button onClick={() => setSelected(null)} style={{ width: 30, height: 30, borderRadius: 15, border: `1px solid ${C.line}`, background: "#fff", color: C.gray, fontSize: 18, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}><span style={{ transform: "translateY(-1px)" }}>×</span></button>
+              <button onClick={closeDetail} style={{ width: 30, height: 30, borderRadius: 15, border: `1px solid ${C.line}`, background: "#fff", color: C.gray, fontSize: 18, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}><span style={{ transform: "translateY(-1px)" }}>×</span></button>
             </div>
           </div>
           <div style={{ fontSize: 24, fontWeight: 900, color: C.dark, marginBottom: 12 }}>{listing.price}</div>
@@ -358,7 +369,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
           ) : (contacted[listing.id] || hasBrokerProposal(listing)) ? (
             <button onClick={() => openChatFromDetail(listing)} style={{ width: "100%", padding: "14px 0", background: G.greenSoft, border: "none", borderRadius: 14, color: C.greenInk, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{listing.fast ? "연락처 확인 완료 · 채팅하기" : safeRequests[listing.id] === "pending" ? "채팅방 열기 · 승인 대기" : "채팅방 열기"}</button>
           ) : (
-            <button onClick={() => { if (listing.fast) handleFast(listing); else { setSelected(null); openApply(listing); } }} style={{ width: "100%", padding: "14px 0", background: insufficient ? "#D5DDD7" : (listing.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (listing.fast ? `연락처 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
+            <button onClick={() => { if (listing.fast) handleFast(listing); else { const viewSeconds = currentViewSeconds(); closeDetail(); openApply(listing, viewSeconds); } }} style={{ width: "100%", padding: "14px 0", background: insufficient ? "#D5DDD7" : (listing.fast ? G.gold : G.header), border: "none", borderRadius: 14, color: "#fff", fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>{insufficient ? "포인트 부족 · 충전 필요" : (listing.fast ? `연락처 확인하기 (-${cost.toLocaleString()}P)` : `중개할게요 (-${cost.toLocaleString()}P)`)}</button>
           )}
         </div>
       </div>
@@ -375,7 +386,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
     const badge = leaseBadge(l);
     const favorite = !!favorites[l.id];
     return (
-      <div key={l.id} onClick={() => setSelected(l.id)} style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: hi?"0 0 0 2px "+C.green+", "+SH1:SH1, transition: "box-shadow .2s", opacity: done?0.78:1, cursor: "pointer" }}>
+      <div key={l.id} onClick={() => openDetail(l.id)} style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: hi?"0 0 0 2px "+C.green+", "+SH1:SH1, transition: "box-shadow .2s", opacity: done?0.78:1, cursor: "pointer" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 11, color: C.gray }}>{updateLabel(l)}</span>
