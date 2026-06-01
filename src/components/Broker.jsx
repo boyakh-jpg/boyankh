@@ -3,7 +3,6 @@ import { C, G, SH1, SH2, spring } from "../theme";
 import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP, PROPERTY_TYPE_GROUPS } from "../data/data";
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
-import { PropertyMap } from "./PropertyMap";
 import { getDemoUser } from "../data/demoUsers";
 import { CACHE_KEYS, getDefaultPointBalance, loadCache, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState, syncCache } from "../data/cache";
 
@@ -79,7 +78,6 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
   const [selected, setSelected] = useState(null);
   const [detailOpenedAt, setDetailOpenedAt] = useState(null);
   const [listMode, setListMode] = useState(menuMode);
-  const [viewMode, setViewMode] = useState("list");
   const [filterOpen, setFilterOpen] = useState(menuMode !== "viewed");
   const [appliedFilters, setAppliedFilters] = useState({ regionGroup, region, dong, ptypes, dealTypes, sort, statusFilter, hideViewed, listMode });
   const chargeOptions = [10000, 30000, 50000, 100000];
@@ -476,15 +474,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
             <span style={{ color: C.greenInk, fontSize: 18 }}>›</span>
           </div>
         )}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-          {[
-            ["list", "목록"],
-            ["map", "지도"],
-          ].map(([key, label]) => (
-            <button key={key} onClick={() => setViewMode(key)} style={{ border: `1.5px solid ${viewMode === key ? C.green : C.line}`, background: viewMode === key ? G.greenSoft : "#fff", color: viewMode === key ? C.greenInk : C.mid, borderRadius: 14, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
-          ))}
-        </div>
-        {viewMode === "list" && (!isViewedMenu || filterOpen) && <MiniMap items={list} activeId={activePin} onPick={pickPin} tone="green"/>}
+        {(!isViewedMenu || filterOpen) && <MiniMap items={list} activeId={activePin} onPick={pickPin} tone="green"/>}
         {isViewedMenu && (
           <button onClick={() => setFilterOpen(v => !v)} style={{ border: "none", background: "transparent", color: C.greenInk, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", padding: "0 2px 8px", marginTop: -2 }}>{filterOpen ? "필터창 숨기기" : "필터창 보이기"}</button>
         )}
@@ -520,7 +510,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
           <div style={{ fontSize: 13, color: C.gray }}>총 {visibleList.length}건{activePin && <span> · 핀 선택됨</span>}{appliedFilters.statusFilter === "완료 매물" && <span style={{ color: C.gray }}> · 완료 매물은 30일간 보관</span>}</div>
           {!isViewedMenu && (hasFilter || hasPendingFilters) && <button onClick={resetFilters} style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.greenInk, borderRadius: 12, padding: "6px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>필터 해제</button>}
         </div>
-        {viewMode === "map" ? <PropertyMap embedded tone="green" allowedListings={visibleList}/> : visibleList.map(Card)}
+        {visibleList.map(Card)}
         <div style={{ height: 64 }}/>
       </div>
     </div>

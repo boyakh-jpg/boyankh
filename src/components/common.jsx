@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FROG_SPRITE } from "../frogSprite";
 import { C, G, SH1, SH2, spring } from "../theme";
@@ -7,6 +7,26 @@ import { CACHE_KEYS, loadCache, saveCache, syncCache } from "../data/cache";
 import { feeFormula, wonText, estFee, priceChangeRate, isDone, termLabel, isExpiringSoon } from "../utils/helpers";
 
 const SW = 160, SH = 160, COLS = 4, ROWS = 4;
+const NAVER_MAP_SCRIPT_ID = "naver-map-sdk";
+const NAVER_MAP_CLIENT_ID = import.meta.env.VITE_NAVER_MAPS_CLIENT_ID;
+const loadNaverMiniMap = () => new Promise((resolve, reject) => {
+  if (typeof window === "undefined") return reject(new Error("window unavailable"));
+  if (window.naver?.maps) return resolve(window.naver.maps);
+  if (!NAVER_MAP_CLIENT_ID) return reject(new Error("missing VITE_NAVER_MAPS_CLIENT_ID"));
+  const current = document.getElementById(NAVER_MAP_SCRIPT_ID);
+  if (current) {
+    current.addEventListener("load", () => resolve(window.naver.maps), { once: true });
+    current.addEventListener("error", reject, { once: true });
+    return;
+  }
+  const script = document.createElement("script");
+  script.id = NAVER_MAP_SCRIPT_ID;
+  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(NAVER_MAP_CLIENT_ID)}`;
+  script.async = true;
+  script.onload = () => resolve(window.naver.maps);
+  script.onerror = reject;
+  document.head.appendChild(script);
+});
 const FROGS = {
   excited:{col:0,row:0}, determined:{col:1,row:0}, calm:{col:2,row:0}, smug:{col:3,row:0},
   confused:{col:0,row:1}, suspicious:{col:1,row:1}, sad:{col:2,row:1}, joyful:{col:3,row:1},
@@ -311,32 +331,71 @@ export function getOwnerProposalCounts(viewerKey, decisions = {}, views = {}) {
   };
 }
 
-// 미니 지도 (SVG, API 키 불필요) — 핀 누르면 onPick
-export function MiniMap({ items, activeId, onPick, tone = "green" }) {
+export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
+  const mapEl = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
+  const [readyError, setReadyError] = useState("");
   const col = tone === "gold" ? C.gold : C.green;
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
+  const mappedItems = items
+    .map(item => ({ ...item, lat: Number(item.lat), lng: Number(item.lng) }))
+    .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
+  const itemKey = mappedItems.map(item => `${item.id}:${item.lat}:${item.lng}`).join("|");
+
+  useEffect(() => {
+    let alive = true;
+    loadNaverMiniMap()
+      .then(maps => {
+        if (!alive || !mapEl.current) return;
+        const centerItem = mappedItems[0] || { lat: 37.5665, lng: 126.9780 };
+        const map = mapRef.current || new maps.Map(mapEl.current, {
+          center: new maps.LatLng(centerItem.lat, centerItem.lng),
+          zoom: mappedItems.length > 1 ? 12 : 15,
+          minZoom: 9,
+          zoomControl: false,
+          mapDataControl: false,
+          scaleControl: false,
+        });
+        mapRef.current = map;
+        markersRef.current.forEach(marker => marker.setMap(null));
+        markersRef.current = mappedItems.map(item => {
+          const selected = activeId === item.id;
+          const marker = new maps.Marker({
+            position: new maps.LatLng(item.lat, item.lng),
+            map,
+            title: item.title || item.complex || item.dong || "매물",
+            icon: {
+              content: `<div style="background:${selected ? col : "#fff"};color:${selected ? "#fff" : ink};border:2px solid ${col};border-radius:14px;padding:4px 9px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 3px 8px rgba(80,110,90,.25);">${item.dong || item.region || "매물"}</div>`,
+              anchor: new maps.Point(20, 28),
+            },
+          });
+          maps.Event.addListener(marker, "click", () => onPick && onPick(item.id));
+          return marker;
+        });
+        if (mappedItems.length > 1) {
+          const bounds = new maps.LatLngBounds();
+          mappedItems.forEach(item => bounds.extend(new maps.LatLng(item.lat, item.lng)));
+          map.fitBounds(bounds);
+        } else if (mappedItems[0]) {
+          map.setCenter(new maps.LatLng(mappedItems[0].lat, mappedItems[0].lng));
+          map.setZoom(15);
+        }
+      })
+      .catch(() => setReadyError("네이버 지도 인증을 확인하세요"));
+    return () => {
+      alive = false;
+      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current = [];
+    };
+  }, [itemKey, activeId, col, ink, onPick]);
+
   return (
-    <div style={{ position: "relative", width: "100%", height: 180, borderRadius: 18, overflow: "hidden", boxShadow: SH2, background: "linear-gradient(160deg,#EAF3ED 0%,#E0EEE6 100%)", marginBottom: 14 }}>
-      {/* 배경: 강(한강) 느낌의 곡선 + 그리드 */}
-      <svg width="100%" height="100%" viewBox="0 0 100 60" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
-        <defs>
-          <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#D2E4D9" strokeWidth="0.4"/></pattern>
-        </defs>
-        <rect width="100" height="60" fill="url(#grid)"/>
-        <path d="M0 30 Q25 22 50 32 T100 30 L100 40 Q75 34 50 42 T0 40 Z" fill="#BFE0EC" opacity="0.7"/>
-        <text x="6" y="20" fontSize="3" fill="#9AA8A0">한강</text>
-      </svg>
-      {/* 핀 */}
-      {items.map(p => {
-        const sel = activeId === p.id;
-        return (
-          <button key={p.id} onClick={() => onPick && onPick(p.id)} style={{ position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%,-100%)", background: "none", border: "none", cursor: "pointer", padding: 0, zIndex: sel?5:1 }}>
-            <div style={{ background: sel?col:"#fff", color: sel?"#fff":ink, fontSize: 11, fontWeight: 800, padding: "3px 8px", borderRadius: 12, boxShadow: "0 3px 8px rgba(80,110,90,.25)", border: `1.5px solid ${col}`, whiteSpace: "nowrap" }}>{p.dong}</div>
-            <div style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${sel?col:"#fff"}`, margin: "0 auto", filter: "drop-shadow(0 2px 1px rgba(80,110,90,.2))" }}/>
-          </button>
-        );
-      })}
-      <div style={{ position: "absolute", bottom: 8, right: 10, fontSize: 10, color: C.gray, background: "#ffffffcc", padding: "2px 8px", borderRadius: 10 }}>핀을 눌러 지역 선택</div>
+    <div style={{ position: "relative", width: "100%", height: 180, borderRadius: 18, overflow: "hidden", boxShadow: SH2, background: "#E8EFEA", marginBottom: 14 }}>
+      <div ref={mapEl} style={{ position: "absolute", inset: 0 }}/>
+      {readyError && <div style={{ position: "absolute", left: 10, right: 10, top: 10, background: "#fff", color: C.mid, border: `1px solid ${C.line}`, borderRadius: 14, padding: "10px 12px", fontSize: 12, fontWeight: 800, boxShadow: SH1 }}>{readyError}</div>}
+      {!readyError && mappedItems.length === 0 && <div style={{ position: "absolute", left: 10, right: 10, top: 10, background: "#fff", color: C.mid, border: `1px solid ${C.line}`, borderRadius: 14, padding: "10px 12px", fontSize: 12, fontWeight: 800, boxShadow: SH1 }}>좌표가 있는 매물이 없어요</div>}
+      <div style={{ position: "absolute", bottom: 8, right: 10, fontSize: 10, color: C.gray, background: "#ffffffdd", padding: "2px 8px", borderRadius: 10 }}>지도 핀 {mappedItems.length}건</div>
     </div>
   );
 }
