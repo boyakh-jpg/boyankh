@@ -341,7 +341,7 @@ export function MiniMap({ items, activeId, onPick, tone = "green" }) {
   );
 }
 
-export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner", itemsOverride = null, onClose, onProposalStateChange }) {
+export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner", itemsOverride = null, onClose, onProposalStateChange, onApproveProposal }) {
   const isBroker = kind === "broker";
   const [showAll, setShowAll] = useState(false);
   const [localDecisions, setLocalDecisions] = useState(() => loadCache(CACHE_KEYS.contactDecisions, {}));
@@ -358,7 +358,7 @@ export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner"
     });
     return () => { alive = false; };
   }, []);
-  const decide = (key, value) => {
+  const decide = (item, key, value) => {
     if (!key) return;
     setLocalDecisions(d => {
       const next = { ...(d && typeof d === "object" && !Array.isArray(d) ? d : {}), [key]: value };
@@ -366,6 +366,7 @@ export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner"
       onProposalStateChange?.({ decisions: next });
       return next;
     });
+    if (value === "approved") onApproveProposal?.({ kind, item });
   };
   const markProposalViewed = item => {
     const key = proposalViewKey(item);
@@ -403,8 +404,8 @@ export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner"
               actionLabel="전화 / 문자 연결"
               onClick={() => markProposalViewed(b)}
               decision={canDecide ? decisions[decisionKey] : null}
-              onApprove={canDecide ? () => decide(decisionKey, "approved") : null}
-              onReject={canDecide ? () => decide(decisionKey, "rejected") : null}
+              onApprove={canDecide ? () => decide(b, decisionKey, "approved") : null}
+              onReject={canDecide ? () => decide(b, decisionKey, "rejected") : null}
             />
           );
         }) : items.map((b, i) => {
@@ -423,8 +424,8 @@ export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner"
                   <div style={{ background: decision === "approved" ? G.greenSoft : "#F2F4F3", border: `1px solid ${decision === "approved" ? C.green : C.line}`, color: decision === "approved" ? C.greenInk : C.gray, borderRadius: 12, padding: "10px 12px", fontSize: 13, fontWeight: 900, textAlign: "center", marginBottom: 8 }}>{decision === "approved" ? "연락처 공개 승인됨" : "연락처 공개 거절됨"}</div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <button onClick={e => { e.stopPropagation(); decide(decisionKey, "approved"); }} style={{ border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>승인</button>
-                    <button onClick={e => { e.stopPropagation(); decide(decisionKey, "rejected"); }} style={{ border: `1.5px solid ${C.line}`, background: "#fff", color: C.gray, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>거절</button>
+                    <button onClick={e => { e.stopPropagation(); decide(b, decisionKey, "approved"); }} style={{ border: "none", background: G.header, color: "#fff", borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>승인</button>
+                    <button onClick={e => { e.stopPropagation(); decide(b, decisionKey, "rejected"); }} style={{ border: `1.5px solid ${C.line}`, background: "#fff", color: C.gray, borderRadius: 12, padding: "10px 0", fontSize: 13, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>거절</button>
                   </div>
                 )
               )}

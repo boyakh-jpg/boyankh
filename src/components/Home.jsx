@@ -150,7 +150,7 @@ function HomeDetailSheet({ listing, tone = "green", onClose }) {
   );
 }
 
-export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerList, onSubscription, role, availableRoles, onSwitchRole, brokerTier = "골드", preferredRegion = "강남구", interestRegion = "마포구", properties = [], demoUser = getDemoUser(), brokerOffices = [], brokerProposals = null, directBuyerProposals = null }) {
+export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerList, onSubscription, onApproveProposal, role, availableRoles, onSwitchRole, brokerTier = "골드", preferredRegion = "강남구", interestRegion = "마포구", properties = [], demoUser = getDemoUser(), brokerOffices = [], brokerProposals = null, directBuyerProposals = null }) {
   const [sheet, setSheet] = useState(null);
   const [detail, setDetail] = useState(null);
   const [officeDetail, setOfficeDetail] = useState(null);
@@ -290,7 +290,7 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
 
   return (
     <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
-      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} viewerKey={demoUser.id} itemsOverride={(typeof sheet === "string" ? sheet : sheet.kind) === "broker" ? ownerBrokerProposalItems : ownerDirectProposalItems} onClose={() => setSheet(null)} onProposalStateChange={updateProposalState}/>}
+      {sheet && <ListSheet kind={typeof sheet === "string" ? sheet : sheet.kind} onlyNew={typeof sheet === "object" && sheet.mode === "new"} viewerKey={demoUser.id} itemsOverride={(typeof sheet === "string" ? sheet : sheet.kind) === "broker" ? ownerBrokerProposalItems : ownerDirectProposalItems} onClose={() => setSheet(null)} onProposalStateChange={updateProposalState} onApproveProposal={onApproveProposal}/>}
       {officeDetail && <OfficeDetail office={officeDetail} contracted={contractedOfficeId === officeDetail.id} onContract={setContractedOfficeId} onClose={() => setOfficeDetail(null)}/>}
       <Header role={role} availableRoles={availableRoles} title="소유주 홈" subtitle="빠르게 집을 내놓아요" mood="calm" onSwitchRole={onSwitchRole} actionLabel="매물 의뢰하기" onAction={onRegister}/>
       <div style={{ padding: "18px 16px 0" }}>

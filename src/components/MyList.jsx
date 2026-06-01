@@ -3,7 +3,7 @@ import { C, G, SH1, SH2 } from "../theme";
 import { isDone, isExpired, isExpiringSoon, daysLeft, termLabel, updateLabel } from "../utils/helpers";
 import { RoleToggle, FilterChips, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, ListSheet, Dot, Btn, Frog, Tag, StatCard } from "./common";
 
-export function MyList({ properties = [], preset = {}, viewerKey = "toad-demo-owner", onRegister, onSetDone, onExtendTerm, onUpdatePrice, onUpdateListing, role, availableRoles, onSwitchRole }) {
+export function MyList({ properties = [], preset = {}, viewerKey = "toad-demo-owner", brokerProposals = [], directBuyerProposals = [], onRegister, onSetDone, onExtendTerm, onUpdatePrice, onUpdateListing, onApproveProposal, role, availableRoles, onSwitchRole }) {
   const [view, setView] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [priceEdit, setPriceEdit] = useState(null);
@@ -46,19 +46,31 @@ export function MyList({ properties = [], preset = {}, viewerKey = "toad-demo-ow
   ]);
   const activeDemoListings = viewerKey === "toad-demo-owner-2" ? ownerTwoDemoListings : viewerKey === "toad-demo-owner" ? demoListings : [];
   const setActiveDemoListings = viewerKey === "toad-demo-owner-2" ? setOwnerTwoDemoListings : setDemoListings;
+  const listingKeys = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id].filter(v => v != null).map(String);
+  const matchesListing = (proposal, listing) => listingKeys(listing).includes(String(proposal?.listingId || ""));
+  const brokerItemsFor = listing => brokerProposals.filter(item => (!item.ownerKey || item.ownerKey === viewerKey) && matchesListing(item, listing));
+  const directItemsFor = listing => directBuyerProposals.filter(item => (!item.ownerKey || item.ownerKey === viewerKey) && matchesListing(item, listing));
+  const sheetItemsFor = (listing, kind) => kind === "broker" ? brokerItemsFor(listing) : directItemsFor(listing);
+  const viewLogFor = listing => brokerItemsFor(listing).map(item => ({
+    name: item.name || item.brokerName || "중개사",
+    office: item.office || item.officeName || "",
+    when: item.when || "방금",
+    sec: item.activityType === "안심의뢰" ? 120 : 35,
+  }));
   // 공용 store에서 내가 등록한 매물 → MyList 표시 형식으로 정규화
   const mine = properties.filter(p => p.mine).map(p => ({
     id: p.id, type: `${p.propType} ${p.dealType}`, dealType: p.dealType,
     region: p.region, dong: p.dong, addr: `${p.region} ${p.dong} ${p.complex}`.trim(),
     detail: `${p.exclusiveArea || p.area}㎡ · ${p.floor}${p.totalFloor ? `/${p.totalFloor}` : ""}층`, price: p.price, priceNum: p.priceNum, fee: p.fee,
     status: p.fast ? "빠른의뢰" : "안심의뢰", tone: p.fast ? "gold" : "green", fast: p.fast,
-    brokers: 0, direct: 0, days: p.expiresInDays ?? 14, views: p.views,
+    brokers: brokerItemsFor(p).length, direct: directItemsFor(p).length, days: p.expiresInDays ?? 14, views: p.views,
     dealState: p.status, doneLabel: p.doneLabel, fromStore: true,
     priceHistory: p.priceHistory, updatedAgo: p.updatedAgo, updatedReason: p.updatedReason,
     description: p.description, maintenance: p.maintenance, parking: p.parking, direction: p.direction, special: p.special,
     supplyArea: p.supplyArea, exclusiveArea: p.exclusiveArea, floor: p.floor, totalFloor: p.totalFloor, roomCount: p.roomCount, bathCount: p.bathCount, moveInDate: p.moveInDate, loan: p.loan, duplex: p.duplex,
     tenant: p.tenant, tenantEnd: p.tenantEnd, tenantDeposit: p.tenantDeposit, tenantMonthly: p.tenantMonthly, tenantMemo: p.tenantMemo,
-    viewLog: [],
+    demoListingId: p.demoListingId || p.demo_listing_id, ownerKey: p.ownerKey, sourceListing: p,
+    viewLog: viewLogFor(p),
   }));
   // 새 등록분이 위로, 그 다음 데모
   const listings = [...mine, ...activeDemoListings];
@@ -224,7 +236,7 @@ export function MyList({ properties = [], preset = {}, viewerKey = "toad-demo-ow
     return (
       <div style={{ paddingBottom: 132, background: G.pageBg, minHeight: "100%", position: "relative" }}>
         {toast && <div style={{ position: "absolute", top: 60, left: "50%", transform: "translateX(-50%)", background: "#3A4A42ee", color: "#fff", padding: "10px 18px", borderRadius: 20, fontSize: 13, zIndex: 60, animation: "fadeIn .2s", boxShadow: SH1, textAlign: "center", maxWidth: "88%" }}>{toast}</div>}
-        {sheet && <ListSheet kind={sheet} viewerKey={viewerKey} onClose={() => setSheet(null)}/>}
+        {sheet && <ListSheet kind={sheet} viewerKey={viewerKey} itemsOverride={sheetItemsFor(l, sheet)} onClose={() => setSheet(null)} onApproveProposal={onApproveProposal}/>}
         {priceEdit && (
           <div onClick={() => setPriceEdit(null)} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
             <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: G.pageBg, borderRadius: "26px 26px 0 0", padding: "20px 18px 28px", boxSizing: "border-box", animation: "sheetUp .3s" }}>

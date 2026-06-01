@@ -238,3 +238,8 @@ create policy "dev can read reports" on public.reports for select to anon using 
 create policy "dev can write reports" on public.reports for insert to anon with check (true);
 create policy "dev can update reports" on public.reports for update to anon using (true) with check (true);
 ```
+## 2026-06-01 추가 작업
+
+- Supabase `broker_proposals` / `direct_buyer_proposals`를 홈, 내 매물, 중개사 열람목록, 직거래 열람목록에서 같은 기준으로 매칭한다.
+- 소유주가 안심의뢰 제안을 승인하면 해당 중개사/직거래 매수자의 채팅 컨텍스트를 생성한다.
+- `broker_proposals` 정규화 결과에 `brokerUserId`, `brokerKey`, `brokerName`을 포함해 중개사 계정별 열람목록 매칭이 가능하다.

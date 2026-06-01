@@ -54,7 +54,7 @@ function MultiFilter({ label, options, values, onToggle, tone = "gold", groups =
 
 const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.includes(v));
 
-export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = "all", onSwitchRole, availableRoles, viewerRole = "buyer", openModal, onOpenChat }) {
+export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [], preset = {}, menuMode = "all", onSwitchRole, availableRoles, viewerRole = "buyer", openModal, onOpenChat }) {
   const demoUser = getDemoUser();
   const pointDefault = getDefaultPointBalance(demoUser.role);
   const [hideViewed, setHideViewed] = useState(true);
@@ -159,10 +159,18 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
 
   const isViewedMenu = menuMode === "viewed";
   const viewTone = { page: G.pageBg, header: G.header, chip: "#ffffff2e" };
+  const listingKeys = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id].filter(v => v != null).map(String);
+  const proposalMatchesListing = (proposal, listing) => listingKeys(listing).includes(String(proposal?.listingId || ""));
+  const proposalForListing = listing => directBuyerProposals.find(proposal =>
+    [proposal.buyerUserId, proposal.buyerKey].filter(Boolean).map(String).includes(String(demoUser.id)) &&
+    proposalMatchesListing(proposal, listing)
+  );
+  const proposalStatus = listing => proposalForListing(listing)?.activityType || null;
+  const hasDirectProposal = listing => !!proposalForListing(listing);
   const inListScope = p => {
-    if (isViewedMenu) return unlocked[p.id] && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
+    if (isViewedMenu) return (unlocked[p.id] || hasDirectProposal(p)) && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
     if (appliedFilters.listMode === "favorite") return favorites[p.id];
-    return !appliedFilters.hideViewed || !unlocked[p.id];
+    return !appliedFilters.hideViewed || !(unlocked[p.id] || hasDirectProposal(p));
   };
   const isListEligible = p => isDone(p) || p.status === "active";
   let list = properties.filter(p => isListEligible(p) && inListScope(p) && matchesAppliedRegion(p) && (appliedFilters.dong === "전체" || p.dong === appliedFilters.dong) && (!appliedFilters.ptypes.length || appliedFilters.ptypes.includes(p.propType)) && (!appliedFilters.dealTypes.length || appliedFilters.dealTypes.includes(p.dealType)) && (p.priceNum || 0) >= appliedFilters.priceMin && (p.priceNum || 0) <= appliedFilters.priceMax);
@@ -267,8 +275,8 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   }, [menuMode]);
 
   const DetailSheet = ({ listing }) => {
-    const open = unlocked[listing.id];
-    const requested = requests[listing.id] === "pending";
+    const open = unlocked[listing.id] || proposalStatus(listing) === "열람";
+    const requested = requests[listing.id] === "pending" || proposalStatus(listing) === "안심의뢰";
     const done = isDone(listing);
     const expired = isTermExpired(listing);
     const badge = leaseBadge(listing);
@@ -352,8 +360,8 @@ export function BuyerExplore({ properties = PROPERTIES, preset = {}, menuMode = 
   };
 
   const Card = p => {
-    const open = unlocked[p.id];
-    const requested = requests[p.id] === "pending";
+    const open = unlocked[p.id] || proposalStatus(p) === "열람";
+    const requested = requests[p.id] === "pending" || proposalStatus(p) === "안심의뢰";
     const hi = activePin === p.id;
     const done = isDone(p);
     const expired = isTermExpired(p);

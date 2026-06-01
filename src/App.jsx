@@ -437,6 +437,34 @@ export default function App() {
     const ownerKey = listing.ownerKey || listing.owner_key || null;
     return { ...listing, ownerKey, ownerLabel: listing.ownerLabel || demoUserLabelFor(demoUsers, ownerKey) };
   };
+  const listingKeys = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id].filter(v => v != null).map(String);
+  const findListingForProposal = proposal => properties.find(listing => listingKeys(listing).includes(String(proposal?.listingId || "")));
+  const saveProposalChatContext = ({ kind, item }) => {
+    const listing = findListingForProposal(item);
+    if (!listing) return;
+    const listingContext = listingWithOwner(listing);
+    if (kind === "broker") {
+      const brokerKey = item.brokerUserId || item.brokerKey || item.brokerOfficeId;
+      if (!brokerKey) return;
+      saveChatContext({
+        id: item.chatId || `listing-${listing.id}-${brokerKey}`,
+        listing: listingContext,
+        mode: item.activityType || (listing.fast ? "빠른의뢰" : "안심의뢰"),
+        brokerKey,
+        brokerName: item.brokerName || item.name || "중개사",
+      });
+      return;
+    }
+    const buyerKey = item.buyerUserId || item.buyerKey;
+    if (!buyerKey) return;
+    saveChatContext({
+      id: item.chatId || `direct-${listing.id}-${buyerKey}`,
+      listing: listingContext,
+      mode: item.activityType || "직거래",
+      buyerKey,
+      buyerName: item.name || "직거래 매수자",
+    });
+  };
   const openBrokerListingChat = listing => openChat({
     id: `listing-${listing.id}-${demoUser.id}`,
     listing: listingWithOwner(listing),
@@ -567,13 +595,13 @@ export default function App() {
           {screen === "splash" && <Splash onNext={() => setScreen("login")}/>}
           {screen === "login" && <Login onLogin={type => { setAccountType(type); setScreen("role"); }}/>}
           {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
-          {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
+          {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
-          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
-          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>}
-          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
-          {screen === "direct" && <BuyerExplore properties={properties} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
+          {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
+          {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} openModal={setModal}/>}
+          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
+          {screen === "direct" && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
           {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole} properties={properties} demoUsers={demoUsers}/>}
           {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} listingContracts={listingContracts} onContractListing={contractListingFromChat} onBack={() => setScreen("chatlist")} properties={properties} demoUsers={demoUsers}/>}
