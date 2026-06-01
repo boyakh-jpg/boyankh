@@ -343,13 +343,27 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
   const mappedItems = items
     .map(item => ({ ...item, lat: Number(item.lat), lng: Number(item.lng) }))
     .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
-  const groupLevel = zoom <= 10 ? "region" : zoom <= 13 ? "dong" : "complex";
-  const groups = Object.values(mappedItems.reduce((acc, item) => {
+  const groupLevel = zoom <= 10 ? "region" : zoom <= 13 ? "dong" : "listing";
+  const coordCounts = {};
+  const groups = groupLevel === "listing" ? mappedItems.map(item => {
+    const coordKey = `${item.lat.toFixed(6)}:${item.lng.toFixed(6)}`;
+    const offsetIndex = coordCounts[coordKey] || 0;
+    coordCounts[coordKey] = offsetIndex + 1;
+    const angle = offsetIndex * 1.7;
+    const radius = offsetIndex ? 0.00008 + offsetIndex * 0.000015 : 0;
+    return {
+      key: `listing:${item.id}`,
+      label: item.complex || item.title || "매물",
+      level: "listing",
+      ids: [item.id],
+      count: 1,
+      lat: item.lat + Math.sin(angle) * radius,
+      lng: item.lng + Math.cos(angle) * radius,
+    };
+  }) : Object.values(mappedItems.reduce((acc, item) => {
     const label = groupLevel === "region"
       ? (item.region || "지역 미분류")
-      : groupLevel === "dong"
-        ? [item.region, item.dong].filter(Boolean).join(" ")
-        : (item.complex || item.title || "단지 미분류");
+      : (item.dong || "동 미분류");
     const key = `${groupLevel}:${label}`;
     const current = acc[key] || { key, label, level: groupLevel, ids: [], count: 0, lat: 0, lng: 0 };
     current.ids.push(item.id);
@@ -388,8 +402,8 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
             map,
             title: group.label,
             icon: {
-              content: `<div style="background:${selected ? col : "#fff"};color:${selected ? "#fff" : ink};border:2px solid ${col};border-radius:16px;padding:5px 10px;font-size:11px;font-weight:900;white-space:nowrap;box-shadow:0 3px 8px rgba(80,110,90,.25);">${group.label} ${group.count}</div>`,
-              anchor: new maps.Point(28, 30),
+              content: `<div style="min-width:28px;height:28px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:${selected ? col : "#fff"};color:${selected ? "#fff" : ink};border:2px solid ${col};border-radius:999px;padding:0 7px;font-size:12px;font-weight:900;box-shadow:0 3px 8px rgba(80,110,90,.25);">${group.count}</div>`,
+              anchor: new maps.Point(14, 28),
             },
           });
           maps.Event.addListener(marker, "click", () => onPick && onPick(group));

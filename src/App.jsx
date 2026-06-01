@@ -14,7 +14,7 @@ import { Settings } from "./components/Settings";
 import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
-import { DEMO_USERS, getDemoUser } from "./data/demoUsers";
+import { DEMO_USERS, getDemoUser, saveDemoUser } from "./data/demoUsers";
 import { CACHE_KEYS, chatReadStateKey, countUnreadChatMessages, loadBackendState, loadCache, loadChatContextsForUser, loadListingContracts, loadLocalState, markChatThreadRead, saveBackendState, saveCache, saveChatContext, saveListingContract, syncCache, syncChatContexts } from "./data/cache";
 import { loadDemoEnvironment } from "./data/supabaseData";
 
@@ -47,9 +47,8 @@ const applyListingContracts = (list, contracts = {}) => list.map(listing => {
   const hasContract = listingContractKeys(listing).some(key => contracts[key]);
   return hasContract ? { ...listing, ...contractedListingPatch(listing) } : listing;
 });
-const roleAccessFor = (demoRole, accountType) => {
-  if (demoRole === "broker" || accountType === "broker") return ["broker", "owner"];
-  if (demoRole === "buyer") return ["buyer", "owner"];
+const roleAccessFor = (_demoRole, accountType) => {
+  if (accountType === "broker") return ["broker", "owner"];
   return ["owner", "buyer"];
 };
 const demoUserLabelFor = (users, key) => {
@@ -544,6 +543,16 @@ export default function App() {
     setAccountType(user.role === "broker" ? "broker" : "user");
     setModal(null);
   };
+  const startLogin = type => {
+    setAccountType(type);
+    setRole(null);
+    if (type !== "broker" && demoUser.role === "broker") {
+      const fallback = demoUsers.find(user => user.role === "owner") || DEMO_USERS.find(user => user.role === "owner") || DEMO_USERS[0];
+      setDemoUser(fallback);
+      saveDemoUser(fallback.id);
+    }
+    setScreen("role");
+  };
   const openBrokerList = (preset = {}) => { setBrokerPreset({ region: preferredRegion, ...preset }); setScreen("broker"); };
   const openBuyerList = (preset = {}) => { setBuyerPreset({ region: preferredRegion, ...preset }); setScreen("buyer"); };
   const openMyList = (preset = {}) => { setMyListPreset(preset); setScreen("mylist"); };
@@ -631,7 +640,7 @@ export default function App() {
             <button onClick={openSettings} aria-label="설정" style={{ position: "absolute", top: 7, right: 24, zIndex: 30, width: 30, height: 30, borderRadius: 15, border: "1px solid #ffffff55", background: "#ffffff2e", color: "#fff", fontSize: 17, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}><span style={{ display: "block", transform: "translateY(-1px)" }}>⚙</span></button>
           )}
           {screen === "splash" && <Splash onNext={() => setScreen("login")}/>}
-          {screen === "login" && <Login onLogin={type => { setAccountType(type); setScreen("role"); }}/>}
+          {screen === "login" && <Login onLogin={startLogin}/>}
           {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
           {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
