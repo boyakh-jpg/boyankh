@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G } from "./theme";
-import { BROKER_OFFICES } from "./data/data";
+import { BROKER_OFFICES, normalizePropType } from "./data/data";
 import { Splash, Login, Role } from "./components/Onboarding";
 import { Register } from "./components/Register";
 import { Home } from "./components/Home";
@@ -80,7 +80,7 @@ const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   region: row.region || "지역 미입력",
   dong: row.dong || "",
   complex: row.complex || row.title || "매물명 미입력",
-  propType: row.propType || row.prop_type || "아파트",
+  propType: normalizePropType(row.propType || row.prop_type || "아파트"),
   dealType: row.dealType || row.deal_type || "매매",
   price: row.price_label || row.priceText || row.price_text || (typeof row.price === "number" ? `${row.price.toLocaleString()}만` : row.price) || "가격 미입력",
   priceNum: row.priceNum || row.price_num || (typeof row.price === "number" ? row.price : 0),

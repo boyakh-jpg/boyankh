@@ -1,3 +1,84 @@
+export const PROPERTY_TYPE_GROUPS = [
+  {
+    label: "주거",
+    types: [
+      { value: "아파트", description: "공동주택" },
+      { value: "오피스텔", description: "주거·수익" },
+      { value: "빌라", description: "빌라·다세대" },
+      { value: "원룸", description: "소형 주거" },
+      { value: "단독/다가구", description: "단독·다가구" },
+    ],
+  },
+  {
+    label: "정비/분양권",
+    types: [
+      { value: "재건축", description: "정비사업" },
+      { value: "재개발", description: "정비사업" },
+      { value: "아파트분양권", description: "분양권 전매" },
+      { value: "오피스텔분양권", description: "분양권 전매" },
+    ],
+  },
+  {
+    label: "상업/업무",
+    types: [
+      { value: "상가", description: "상업시설" },
+      { value: "상가주택", description: "상업+주거" },
+      { value: "사무실", description: "업무시설" },
+      { value: "건물", description: "통건물" },
+    ],
+  },
+  {
+    label: "토지/산업",
+    types: [
+      { value: "토지", description: "대지·전답" },
+      { value: "공장/창고", description: "산업시설" },
+      { value: "지식산업센터", description: "업무·산업" },
+    ],
+  },
+];
+
+export const PROPERTY_TYPE_OPTIONS = PROPERTY_TYPE_GROUPS.flatMap(group => group.types.map(type => ({ ...type, group: group.label })));
+export const PROP_TYPES = ["전체", ...PROPERTY_TYPE_OPTIONS.map(type => type.value)];
+export const RIGHTS_PROP_TYPES = ["재건축", "재개발", "아파트분양권", "오피스텔분양권"];
+export const PROPERTY_TYPE_ALIASES = {
+  Apt: "아파트",
+  Villa: "빌라",
+  Officetel: "오피스텔",
+  Shop: "상가",
+  Land: "토지",
+  "빌라/다세대": "빌라",
+  "단독주택": "단독/다가구",
+  입주권: "재건축",
+  분양권: "아파트분양권",
+  "재개발·재건축": "재건축",
+  상기: "상가",
+};
+export const normalizePropType = type => PROPERTY_TYPE_ALIASES[type] || type || "아파트";
+const housingDeals = [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]];
+const commercialDeals = [["매매", "소유권 이전"], ["임대", "보증금+월 임대료"]];
+export const REGISTER_DEAL_OPTIONS_BY_PROP = {
+  아파트: housingDeals,
+  오피스텔: housingDeals,
+  빌라: housingDeals,
+  원룸: housingDeals,
+  "단독/다가구": housingDeals,
+  재건축: [["권리양도", "정비사업 권리 이전"]],
+  재개발: [["권리양도", "정비사업 권리 이전"]],
+  아파트분양권: [["전매", "분양계약 권리 이전"]],
+  오피스텔분양권: [["전매", "분양계약 권리 이전"]],
+  상가: commercialDeals,
+  상가주택: commercialDeals,
+  사무실: commercialDeals,
+  건물: commercialDeals,
+  토지: [["매매", "토지 소유권 이전"]],
+  "공장/창고": commercialDeals,
+  지식산업센터: commercialDeals,
+};
+export const DEAL_TYPES_BY_PROP = {
+  전체: ["전체", "매매", "전세", "월세", "임대", "권리양도", "전매"],
+  ...Object.fromEntries(Object.entries(REGISTER_DEAL_OPTIONS_BY_PROP).map(([type, deals]) => [type, ["전체", ...deals.map(([deal]) => deal)]])),
+};
+
 const agoToDays = ago => {
   if (!ago || /방금|분|시간/.test(ago)) return 0;
   if (ago === "어제") return 1;
@@ -20,7 +101,8 @@ const makePriceHistory = (priceNum, idx) => {
 
 const makeTenantInfo = (p, idx) => {
   if (p.tenant) return {};
-  const canHaveTenant = p.dealType === "매매" && ["아파트", "빌라", "오피스텔", "상가"].includes(p.propType);
+  const propType = normalizePropType(p.propType);
+  const canHaveTenant = p.dealType === "매매" && ["아파트", "빌라", "오피스텔", "원룸", "단독/다가구", "상가", "상가주택", "사무실", "건물"].includes(propType);
   if (!canHaveTenant) return { tenant: "없어요 (공실)" };
   if (idx % 3 !== 0) return { tenant: "없어요 (공실)" };
   const hasMonthly = idx % 2 === 0;
@@ -141,6 +223,7 @@ const RAW_PROPERTIES = [
 ];
 export const PROPERTIES = RAW_PROPERTIES.map((p, i) => ({
   ...p,
+  propType: normalizePropType(p.propType),
   ...makeTenantInfo(p, i),
   ownerPhone: makeOwnerPhone(p, i),
   createdDaysAgo: p.createdDaysAgo ?? agoToDays(p.ago),
@@ -150,21 +233,6 @@ export const PROPERTIES = RAW_PROPERTIES.map((p, i) => ({
   priceHistory: p.priceHistory || makePriceHistory(p.priceNum, i),
 }));
 export const REGIONS = ["전체", "강남구", "서초구", "송파구", "강동구", "마포구", "용산구", "성동구", "영등포구"];
-export const PROP_TYPES = ["전체", "아파트", "빌라", "오피스텔", "상가", "토지", "입주권", "분양권", "재개발"];
-export const DEAL_TYPES_BY_PROP = {
-  "전체": ["전체", "매매", "전세", "월세", "임대", "권리양도", "전매"],
-  "아파트": ["전체", "매매", "전세", "월세"],
-  "빌라": ["전체", "매매", "전세", "월세"],
-  "빌라/다세대": ["전체", "매매", "전세", "월세"],
-  "단독주택": ["전체", "매매", "전세", "월세"],
-  "오피스텔": ["전체", "매매", "전세", "월세"],
-  "상가": ["전체", "매매", "임대"],
-  "토지": ["전체", "매매"],
-  "입주권": ["전체", "권리양도"],
-  "분양권": ["전체", "전매"],
-  "재개발": ["전체", "권리양도"],
-  "재개발·재건축": ["전체", "권리양도"],
-};
 
 const officeTier = percentile => percentile <= 3 ? "지역 대표 부동산" : percentile <= 10 ? "지역 파워 부동산" : percentile <= 30 ? "지역 우수 부동산" : "검증 부동산";
 
@@ -263,7 +331,7 @@ const STATIC_BROKER_OFFICES = [
 
 const BROKER_REGIONS = ["강남구", "서초구", "송파구", "강동구", "마포구", "용산구", "성동구", "영등포구"];
 const BROKER_DONGS = ["역삼동", "반포동", "잠실동", "천호동", "공덕동", "이촌동", "성수동", "여의도동"];
-const BROKER_TYPES = ["아파트", "오피스텔", "빌라", "상가"];
+const BROKER_TYPES = PROPERTY_TYPE_OPTIONS.map(type => type.value);
 const BROKER_NAMES = ["김민준", "이수연", "박지훈", "최은영", "정하늘", "오하린", "서민재", "강도윤", "한유진", "문지성"];
 const padBroker = value => String(value).padStart(3, "0");
 

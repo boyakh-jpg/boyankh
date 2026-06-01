@@ -26,7 +26,7 @@
 - 부동산 찾기/제안 승인: `src/components/BrokerOffices.jsx`, `src/components/common.jsx`, `src/data/cache.js`
 - 공통 UI/팝업/카드: `src/components/common.jsx`, `src/components/modals.jsx`, `src/theme.js`
 - Supabase 연결: `src/supabaseClient.js`, `src/data/cache.js`, `src/App.jsx`
-- 더미 데이터: `src/data/data.js`, `src/data/demoUsers.js`
+- 매물유형/더미 데이터: `src/data/data.js`, `src/data/demoUsers.js`
 - 스타일/전역 레이아웃: `src/App.css`, `src/index.css`, `src/theme.js`
 - 이미지/아이콘: `src/assets/toad.png`, `src/frogSprite.js`, `public/icons.svg`, `public/favicon.svg`
 
@@ -54,7 +54,7 @@
 | `src/assets/toad.png` | 유지해야 할 원본 이미지 | 삭제/교체 금지 |
 | `src/utils/helpers.js` | 만료/신규/수수료/가격 계산 | 기준값/필터 오류 |
 | `src/data/cache.js` | Supabase 임시 상태, 포인트, 채팅 컨텍스트 | 저장/권한/fallback |
-| `src/data/data.js` | 더미 매물, 부동산, 채팅 데이터 | 더미/표시 데이터 |
+| `src/data/data.js` | 매물유형 그룹, 더미 매물, 부동산, 채팅 데이터 | 유형/더미/표시 데이터 |
 | `src/data/demoUsers.js` | 테스트 아이디 선택 | 아이디 전환 |
 | `src/components/Onboarding.jsx` | 시작/로그인/역할 선택 | 진입 흐름 |
 | `src/components/Home.jsx` | 홈 카드/추천/오늘 할 일 | 홈 화면 |

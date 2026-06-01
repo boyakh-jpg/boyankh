@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
 import { C, G, SH1, SH2, spring } from "../theme";
-import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP } from "../data/data";
+import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP, PROPERTY_TYPE_GROUPS } from "../data/data";
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, estFee, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Tag, Dot, Frog } from "./common";
 import { getDemoUser } from "../data/demoUsers";
 import { CACHE_KEYS, getDefaultPointBalance, loadCache, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState, syncCache } from "../data/cache";
 
-function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
+function MultiFilter({ label, options, values, onToggle, tone = "green", groups = null }) {
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
   const soft = tone === "gold" ? G.goldSoft : G.greenSoft;
   const col = tone === "gold" ? C.gold : C.green;
   const [open, setOpen] = useState(false);
   const summary = values.length ? `${values.slice(0, 2).join(", ")}${values.length > 2 ? ` 외 ${values.length - 2}` : ""}` : "전체";
+  const optionGroups = Array.isArray(groups)
+    ? groups.map(group => ({ ...group, types: group.types.filter(type => options.includes(type.value)) })).filter(group => group.types.length)
+    : null;
   return (
     <div style={{ marginTop: 10, position: "relative", zIndex: open ? 80 : 1 }}>
       <button onClick={() => setOpen(o => !o)} style={{ width: "100%", border: `1.5px solid ${values.length ? col : C.line}`, background: values.length ? soft : "#fff", borderRadius: 14, padding: "11px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontFamily: "inherit" }}>
@@ -20,14 +23,28 @@ function MultiFilter({ label, options, values, onToggle, tone = "green" }) {
         <span style={{ color: ink, fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}>⌄</span>
       </button>
       {open && <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 6px)", background: "#fff", border: `1.5px solid ${col}`, borderRadius: 16, padding: 10, boxShadow: "0 14px 32px rgba(39,57,47,.18)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        {options.map(o => {
-          const active = values.includes(o);
-          return (
-            <button key={o} onClick={() => onToggle(o)} style={{ border: `1.5px solid ${active ? col : C.line}`, background: active ? soft : "#fff", color: active ? ink : C.mid, borderRadius: 18, padding: "7px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>{active ? "✓ " : ""}{o}</button>
-          );
-        })}
-        </div>
+        {optionGroups ? optionGroups.map(group => (
+          <div key={group.label} style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: C.gray, fontWeight: 900, margin: "2px 0 5px 2px" }}>{group.label}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {group.types.map(({ value: o }) => {
+                const active = values.includes(o);
+                return (
+                  <button key={o} onClick={() => onToggle(o)} style={{ border: `1.5px solid ${active ? col : C.line}`, background: active ? soft : "#fff", color: active ? ink : C.mid, borderRadius: 18, padding: "7px 8px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.25 }}>{active ? "✓ " : ""}{o}</button>
+                );
+              })}
+            </div>
+          </div>
+        )) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {options.map(o => {
+              const active = values.includes(o);
+              return (
+                <button key={o} onClick={() => onToggle(o)} style={{ border: `1.5px solid ${active ? col : C.line}`, background: active ? soft : "#fff", color: active ? ink : C.mid, borderRadius: 18, padding: "7px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>{active ? "✓ " : ""}{o}</button>
+              );
+            })}
+          </div>
+        )}
         <button onClick={() => setOpen(false)} style={{ width: "100%", marginTop: 8, border: "none", background: values.length ? G.header : "#F2F4F3", color: values.length ? "#fff" : C.gray, borderRadius: 12, padding: "9px 0", fontSize: 12, fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>닫기</button>
       </div>}
     </div>
@@ -437,7 +454,7 @@ export function Broker({ properties = PROPERTIES, preset = {}, menuMode = "all",
               <SelectBox label="시/군/구" value={region} options={REGIONS} onChange={changeRegion}/>
               <SelectBox label="읍/면/동" value={dong} options={dongOptions} onChange={setDong}/>
             </div>
-            <MultiFilter label="매물 분류" options={ptypeOptions} values={ptypes} onToggle={togglePtype}/>
+            <MultiFilter label="매물 분류" options={ptypeOptions} values={ptypes} onToggle={togglePtype} groups={PROPERTY_TYPE_GROUPS}/>
             <MultiFilter label="거래 유형" options={dealOptions} values={dealTypes} onToggle={toggleDealType}/>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
               <SelectBox label="정렬" value={sort} options={["최신순","낮은가격순","높은가격순","수수료높은순","추이 상승순","추이 하락순"]} onChange={setSort}/>

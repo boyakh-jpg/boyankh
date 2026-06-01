@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { C, G, SH1, SH2 } from "../theme";
 import { Frog, Btn, Dots, Slide, Tag, Dot } from "./common";
+import { PROPERTY_TYPE_GROUPS, REGISTER_DEAL_OPTIONS_BY_PROP, RIGHTS_PROP_TYPES, normalizePropType } from "../data/data";
 
 
 export function Register({ onDone, onClose, onBack }) {
@@ -14,21 +15,9 @@ export function Register({ onDone, onClose, onBack }) {
   const TOTAL = 10;
   const next = () => { setDir(1); setStep(s => s + 1); };
   const back = () => { if (step === 0) return onBack(); setDir(-1); setStep(s => s - 1); };
-  const DEAL_OPTIONS_BY_PROP = {
-    "아파트": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
-    "빌라/다세대": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
-    "단독주택": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
-    "오피스텔": [["매매", "소유권 이전"], ["전세", "보증금 일시 납부"], ["월세", "보증금+매월 납부"]],
-    "상가": [["매매", "상가 소유권 이전"], ["임대", "보증금+월 임대료+권리금"]],
-    "토지": [["매매", "토지 소유권 이전"]],
-    "입주권": [["권리양도", "조합원 권리 이전"]],
-    "분양권": [["전매", "분양계약 권리 이전"]],
-    "재개발·재건축": [["권리양도", "정비사업 권리 이전"]],
-  };
-  const dealOptions = DEAL_OPTIONS_BY_PROP[d.propType] || [];
-  const rightsTypes = ["입주권", "분양권", "재개발·재건축"];
+  const dealOptions = REGISTER_DEAL_OPTIONS_BY_PROP[d.propType] || [];
   const selectPropType = propType => {
-    const nextDeal = (DEAL_OPTIONS_BY_PROP[propType] || [])[0]?.[0] || "";
+    const nextDeal = (REGISTER_DEAL_OPTIONS_BY_PROP[propType] || [])[0]?.[0] || "";
     setD(p => ({ ...p, propType, dealType: nextDeal, deposit: "", monthly: "", premium: "" }));
     setTimeout(next, 160);
   };
@@ -49,11 +38,11 @@ export function Register({ onDone, onClose, onBack }) {
   const monthlyNum = parseInt(d.monthly, 10) || 0;
   const premiumNum = parseInt(d.premium, 10) || 0;
   // 권리성 상품은 거래금액 = 권리가/분양가 + 프리미엄
-  const isRights = rightsTypes.includes(d.propType);
+  const isRights = RIGHTS_PROP_TYPES.includes(d.propType);
   const isLand = d.propType === "토지";
-  const isCommercialLease = d.propType === "상가" && d.dealType === "임대";
+  const isCommercialLease = ["상가", "상가주택", "사무실", "건물", "공장/창고", "지식산업센터"].includes(d.propType) && d.dealType === "임대";
   const isMonthlyLike = d.dealType === "월세" || isCommercialLease;
-  const rightsBaseLabel = d.propType === "분양권" ? "분양가" : "권리가";
+  const rightsBaseLabel = d.propType.includes("분양권") ? "분양가" : "권리가";
   const rightsTotal = depositNum + premiumNum;
   // 가격 입력 미리보기
   const pricePreview = !d.deposit ? "" :
@@ -77,14 +66,12 @@ export function Register({ onDone, onClose, onBack }) {
     // price 문자열: 매매/전세/토지는 만원→억/만 표기, 월세/상가임대는 "보증금/월세만", 권리성 상품은 총액
     const manToPrice = man => { const n=parseInt(man,10)||0; const eok=Math.floor(n/10000); const rest=n%10000; return eok>0?`${eok}억${rest>0?` ${rest.toLocaleString()}만`:""}`:`${n.toLocaleString()}만`; };
     const priceStr = isRights ? manToPrice(String(rightsTotal)) : (isMonthlyLike ? `${depositNum.toLocaleString()}/${monthlyNum}만${isCommercialLease && premiumNum ? ` 권리금 ${manToPrice(d.premium)}` : ""}` : manToPrice(d.deposit));
-    // 종류 매핑 (등록은 "빌라/다세대" 등 세분 → 목록 필터용 단순화)
-    const typeMap = { "아파트":"아파트", "빌라/다세대":"빌라", "단독주택":"빌라", "오피스텔":"오피스텔", "상가":"상가", "토지":"토지", "입주권":"입주권", "분양권":"분양권", "재개발·재건축":"재개발" };
     const doneLabelMap = { "매매":"매도완료", "전세":"전세완료", "월세":"임대완료", "임대":"임대완료", "권리양도":"양도완료", "전매":"전매완료" };
     return {
       id: "u" + Date.now(),
       region: regionMatch, dong: dongMatch,
       complex: d.address.split(" ").slice(-1)[0] || "새 매물",
-      propType: typeMap[d.propType] || "아파트",
+      propType: normalizePropType(d.propType),
       dealType: d.dealType,
       price: priceStr, priceNum: isRights ? rightsTotal : depositNum,
       premium: (isRights || isCommercialLease) ? premiumNum : null,
@@ -142,11 +129,18 @@ export function Register({ onDone, onClose, onBack }) {
             <div><div style={{ fontSize: 20, fontWeight: 800, color: C.dark, lineHeight: 1.25 }}>{titles[step]}</div><div style={{ fontSize: 13, color: C.gray, marginTop: 3 }}>{subs[step]}</div></div>
           </div>
           {step === 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {[["아파트","주거"],["빌라/다세대","주거"],["단독주택","주거"],["오피스텔","주거·수익"],["상가","수익형"],["토지","대지·전답"],["입주권","조합원 권리"],["분양권","청약 당첨"],["재개발·재건축","정비사업"]].map(([t, ds]) => (
-                <div key={t} onClick={() => selectPropType(t)} style={{ padding: "18px 12px", borderRadius: 18, border: `2px solid ${d.propType===t?C.green:C.line}`, background: d.propType===t?G.greenSoft:G.card, textAlign: "center", cursor: "pointer", transition: "all .15s", boxShadow: d.propType===t?"none":SH2 }}>
-                  <div style={{ fontSize: 15, fontWeight: d.propType===t?700:500, color: d.propType===t?C.greenInk:C.dark }}>{t}</div>
-                  <div style={{ fontSize: 11, color: C.gray, marginTop: 3 }}>{ds}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {PROPERTY_TYPE_GROUPS.map(group => (
+                <div key={group.label}>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: C.mid, margin: "0 0 7px 2px" }}>{group.label}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {group.types.map(({ value: t, description: ds }) => (
+                      <div key={t} onClick={() => selectPropType(t)} style={{ padding: "15px 10px", borderRadius: 18, border: `2px solid ${d.propType===t?C.green:C.line}`, background: d.propType===t?G.greenSoft:G.card, textAlign: "center", cursor: "pointer", transition: "all .15s", boxShadow: d.propType===t?"none":SH2 }}>
+                        <div style={{ fontSize: 14, fontWeight: d.propType===t?700:500, color: d.propType===t?C.greenInk:C.dark, lineHeight: 1.25 }}>{t}</div>
+                        <div style={{ fontSize: 11, color: C.gray, marginTop: 3 }}>{ds}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -185,7 +179,7 @@ export function Register({ onDone, onClose, onBack }) {
               )}
               {!isRights && (d.dealType === "매매" || d.dealType === "전세") && (
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{isLand ? "토지 매매가" : d.propType === "상가" && d.dealType === "매매" ? "상가 매매가" : d.dealType === "매매" ? "매매가" : "전세 보증금"}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>{isLand ? "토지 매매가" : d.dealType === "매매" ? `${d.propType} 매매가` : "전세 보증금"}</div>
                   <div style={{ position: "relative" }}>
                     <input inputMode="numeric" placeholder="예: 125000" value={d.deposit} onChange={e => set("deposit", e.target.value.replace(/[^0-9]/g, ""))} autoFocus style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
                     <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>
@@ -195,7 +189,7 @@ export function Register({ onDone, onClose, onBack }) {
               {!isRights && isCommercialLease && (
                 <>
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>상가 보증금</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.mid, marginBottom: 6 }}>임대 보증금</div>
                     <div style={{ position: "relative" }}>
                       <input inputMode="numeric" placeholder="예: 5000" value={d.deposit} onChange={e => set("deposit", e.target.value.replace(/[^0-9]/g, ""))} autoFocus style={{ width: "100%", padding: 16, paddingRight: 48, borderRadius: 16, border: `1.5px solid ${C.line}`, fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" }}/>
                       <span style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: C.gray }}>만원</span>

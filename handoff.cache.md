@@ -40,6 +40,7 @@
 - 앱 시작 시 정적 매물 더미를 화면에 먼저 넣지 않음. SQL 미실행 시 매물/부동산/제안은 비어 보일 수 있다.
 - 채팅방 계약 체결은 `listing_contracts` 전용 테이블을 먼저 읽고 쓴다. 테이블이 없으면 기존 `toad.listingContracts` fallback 유지.
 - `listing_contracts` 저장 시 DB trigger가 해당 `listings` 행을 `done`으로 만료 처리한다.
+- 매물유형은 `주거`, `정비/분양권`, `상업/업무`, `토지/산업` 그룹으로 정리. 등록/중개사 필터/직거래 필터가 같은 유형 목록을 쓴다.
 
 ## 다음 확인
 
@@ -52,6 +53,7 @@
 - 다음 세션 시작 시 `handoff.map.md` 기준으로 필요한 파일만 읽는지 확인.
 - Vercel 흰화면이 남으면 배포 로그와 브라우저 콘솔을 먼저 확인.
 - Supabase SQL Editor에서 `202606010001_create_listing_contracts.sql` 실행 후 채팅방 계약 체결 시 매물 상태가 완료로 바뀌는지 확인.
+- Supabase SQL Editor에서 `202606010002_group_property_types.sql` 실행 후 `listing_prop_type_distribution` 결과 확인.
 
 ## 작업 우선순위
 

@@ -63,6 +63,16 @@ from (
 
 union all
 
+select 'listing_prop_type_distribution', jsonb_object_agg(prop_type, cnt order by prop_type)
+from (
+  select coalesce(prop_type, 'null') as prop_type, count(*) as cnt
+  from public.listings
+  where owner_key like 'owner-%'
+  group by coalesce(prop_type, 'null')
+) s
+
+union all
+
 select 'broker_proposal_activity', jsonb_object_agg(activity_type, cnt order by activity_type)
 from (
   select activity_type, count(*) as cnt

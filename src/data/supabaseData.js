@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { normalizePropType } from "./data";
 
 const asArray = value => Array.isArray(value) ? value : [];
 const byId = rows => Object.fromEntries(asArray(rows).map(row => [row.id, row]));
@@ -33,7 +34,7 @@ const normalizeOffice = row => ({
   phone: row.phone,
   region: row.region,
   specialtyRegions: row.specialty_regions || [],
-  specialtyTypes: row.specialty_types || [],
+  specialtyTypes: (row.specialty_types || []).map(normalizePropType),
   verifiedDeals12m: row.verified_deals_12m || 0,
   percentileInRegion: row.percentile_in_region || 99,
   tier: row.tier || "검증 부동산",
