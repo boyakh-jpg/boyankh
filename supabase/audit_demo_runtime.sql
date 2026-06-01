@@ -73,6 +73,40 @@ from (
 
 union all
 
+select 'listing_address_quality', jsonb_build_object(
+  'english_listing_addresses', (
+    select count(*)
+    from public.listings
+    where owner_key like 'owner-%'
+      and (
+        coalesce(address, '') ~ '[A-Za-z]'
+        or coalesce(region, '') ~ '[A-Za-z]'
+        or coalesce(dong, '') ~ '[A-Za-z]'
+        or coalesce(complex, '') ~ '[A-Za-z]'
+      )
+  ),
+  'english_broker_addresses', (
+    select count(*)
+    from public.broker_offices
+    where coalesce(address, '') ~ '[A-Za-z]'
+      or coalesce(region, '') ~ '[A-Za-z]'
+      or coalesce(office_name, '') ~ '[A-Za-z]'
+  ),
+  'listings_missing_address_parts', (
+    select count(*)
+    from public.listings
+    where owner_key like 'owner-%'
+      and (
+        coalesce(address, '') = ''
+        or coalesce(region, '') = ''
+        or coalesce(dong, '') = ''
+        or coalesce(complex, '') = ''
+      )
+  )
+) as result
+
+union all
+
 select 'broker_proposal_activity', jsonb_object_agg(activity_type, cnt order by activity_type)
 from (
   select activity_type, count(*) as cnt
