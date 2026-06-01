@@ -38,6 +38,8 @@
 - 프론트는 `demo_users`, `broker_offices`, `broker_proposals`, `direct_buyer_proposals`, `listings`를 Supabase에서 먼저 읽는다.
 - 설정 화면 테스트 아이디는 소유주/중개사/직거래 매수자 드롭다운으로 분리.
 - 앱 시작 시 정적 매물 더미를 화면에 먼저 넣지 않음. SQL 미실행 시 매물/부동산/제안은 비어 보일 수 있다.
+- 채팅방 계약 체결은 `listing_contracts` 전용 테이블을 먼저 읽고 쓴다. 테이블이 없으면 기존 `toad.listingContracts` fallback 유지.
+- `listing_contracts` 저장 시 DB trigger가 해당 `listings` 행을 `done`으로 만료 처리한다.
 
 ## 다음 확인
 
@@ -49,6 +51,7 @@
 - 빠른의뢰 제안에는 승인/거절 버튼이 없는지 확인.
 - 다음 세션 시작 시 `handoff.map.md` 기준으로 필요한 파일만 읽는지 확인.
 - Vercel 흰화면이 남으면 배포 로그와 브라우저 콘솔을 먼저 확인.
+- Supabase SQL Editor에서 `202606010001_create_listing_contracts.sql` 실행 후 채팅방 계약 체결 시 매물 상태가 완료로 바뀌는지 확인.
 
 ## 작업 우선순위
 
@@ -57,7 +60,8 @@
 3. StackBlitz에서 테스트 아이디 변경 후 포인트/열람/즐겨찾기/요청/채팅방/프로필 유지 확인.
 4. `contact_unlocks` 또는 RPC로 연락처 공개 권한 처리.
 5. `chats`, `chat_participants`, `chat_messages` 권한형 구조로 전환.
-6. `demo_app_state`에 남은 기본/관심지역, 알림, 즐겨찾기류 임시 상태를 전용 구조로 이관 후 제거.
+6. `listing_contracts` 정책을 Supabase Auth/RPC 기준으로 강화.
+7. `demo_app_state`에 남은 기본/관심지역, 알림, 즐겨찾기류 임시 상태를 전용 구조로 이관 후 제거.
 
 ## storage 반영 후 지울 항목
 
@@ -76,6 +80,7 @@
 
 - `demo_app_state`: 전용 테이블 전환 전 임시 Supabase 상태 저장소.
 - `toad.chatContexts`: 매물별 채팅 컨텍스트. `demo_app_state` + localStorage fallback.
+- `toad.listingContracts`: 계약 체결 fallback. `listing_contracts` 우선, 없으면 `demo_app_state` + localStorage fallback.
 - `toad.{demoUserId}.brokerViewed`: 중개사 열람 목록. `demo_app_state` + localStorage fallback.
 - `toad.{demoUserId}.brokerContacted`: 중개사 연락처 열람 상태. `demo_app_state` + localStorage fallback.
 - `toad.{demoUserId}.brokerSafeRequests`: 중개사 안심의뢰 상태. `demo_app_state` + localStorage fallback.

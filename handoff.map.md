@@ -21,7 +21,7 @@
 - 내 매물/등록: `src/components/MyList.jsx`, `src/components/Register.jsx`, `src/App.jsx`
 - 중개사 매물 열람: `src/components/Broker.jsx`, `src/data/cache.js`, `src/utils/helpers.js`
 - 직거래 매물 열람: `src/components/BuyerExplore.jsx`, `src/data/cache.js`, `src/utils/helpers.js`
-- 채팅: `src/components/Chat.jsx`, `src/data/cache.js`, `src/data/data.js`
+- 채팅/계약 체결: `src/components/Chat.jsx`, `src/data/cache.js`, `src/App.jsx`
 - 설정/계정/결제/문의/신고: `src/components/Settings.jsx`, `src/components/Subscription.jsx`, `src/data/cache.js`
 - 부동산 찾기/제안 승인: `src/components/BrokerOffices.jsx`, `src/components/common.jsx`, `src/data/cache.js`
 - 공통 UI/팝업/카드: `src/components/common.jsx`, `src/components/modals.jsx`, `src/theme.js`
@@ -91,6 +91,7 @@
   - `chats`
   - `chat_participants`
   - `chat_messages`
+  - `listing_contracts`
   - `profiles`
   - `support_tickets`
   - `reports`

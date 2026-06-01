@@ -285,6 +285,81 @@ export async function syncCache(key, fallback) {
   return value;
 }
 
+const listingContractFromRow = row => ({
+  listingId: row.listing_id,
+  chatId: row.chat_id,
+  partnerName: row.partner_name || "",
+  property: row.property || "",
+  contractedAt: row.contracted_at,
+});
+
+export async function loadListingContracts() {
+  const local = loadCache(CACHE_KEYS.listingContracts, {});
+  const fallback = local && typeof local === "object" && !Array.isArray(local) ? local : {};
+  let legacy = fallback;
+  try {
+    const synced = await syncCache(CACHE_KEYS.listingContracts, fallback);
+    if (synced && typeof synced === "object" && !Array.isArray(synced)) legacy = synced;
+  } catch {}
+
+  try {
+    const { data, error } = await supabase
+      .from("listing_contracts")
+      .select("listing_id,chat_id,partner_name,property,contracted_at");
+    if (error) throw error;
+    const next = { ...legacy };
+    (data || []).forEach(row => {
+      const contract = listingContractFromRow(row);
+      if (contract.listingId) next[contract.listingId] = contract;
+    });
+    memoryCache[CACHE_KEYS.listingContracts] = next;
+    saveLocalState(CACHE_KEYS.listingContracts, next);
+    return next;
+  } catch (error) {
+    if (!String(error?.message || "").includes("listing_contracts")) {
+      console.error("Supabase listing_contracts load error:", error);
+    }
+    return legacy;
+  }
+}
+
+export async function saveListingContract(contract) {
+  const listingId = String(contract?.listingId || "");
+  if (!listingId) return loadCache(CACHE_KEYS.listingContracts, {});
+  const current = loadCache(CACHE_KEYS.listingContracts, {});
+  const base = current && typeof current === "object" && !Array.isArray(current) ? current : {};
+  const nextContract = {
+    listingId,
+    chatId: contract.chatId,
+    partnerName: contract.partnerName || "",
+    property: contract.property || "",
+    contractedAt: contract.contractedAt || new Date().toISOString(),
+  };
+  const next = { ...base, [listingId]: nextContract };
+  memoryCache[CACHE_KEYS.listingContracts] = next;
+  saveLocalState(CACHE_KEYS.listingContracts, next);
+
+  try {
+    const { error } = await supabase
+      .from("listing_contracts")
+      .upsert({
+        listing_id: listingId,
+        chat_id: nextContract.chatId,
+        partner_name: nextContract.partnerName,
+        property: nextContract.property,
+        contracted_at: nextContract.contractedAt,
+      }, { onConflict: "listing_id" });
+    if (error) throw error;
+  } catch (error) {
+    if (!String(error?.message || "").includes("listing_contracts")) {
+      console.error("Supabase listing_contracts save error:", error);
+    }
+  }
+
+  await saveBackendState(CACHE_KEYS.listingContracts, next);
+  return next;
+}
+
 export const chatReadStateKey = (userId, role) => `${CACHE_KEYS.chatReads}.${userId || "guest"}.${role || "guest"}`;
 
 export function isUnreadChatMessage(message, reads = {}, userId) {

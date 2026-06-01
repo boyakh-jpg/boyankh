@@ -15,7 +15,7 @@ import { Frog } from "./components/common";
 import { ApplyMsgBody, PayBody, EditMsgBody } from "./components/modals";
 import { supabase } from "./supabaseClient";
 import { DEMO_USERS, getDemoUser } from "./data/demoUsers";
-import { CACHE_KEYS, chatReadStateKey, countUnreadChatMessages, loadBackendState, loadCache, loadChatContextsForUser, loadLocalState, markChatThreadRead, saveBackendState, saveCache, saveChatContext, syncCache, syncChatContexts } from "./data/cache";
+import { CACHE_KEYS, chatReadStateKey, countUnreadChatMessages, loadBackendState, loadCache, loadChatContextsForUser, loadListingContracts, loadLocalState, markChatThreadRead, saveBackendState, saveChatContext, saveListingContract, syncCache, syncChatContexts } from "./data/cache";
 import { loadDemoEnvironment } from "./data/supabaseData";
 
 const loadSetting = (key, fallback) => {
@@ -35,7 +35,8 @@ const saveSetting = (key, value) => {
   } catch {}
   saveBackendState(key, value);
 };
-const listingContractKey = listing => String(listing?.id || listing?.demoListingId || listing?.demo_listing_id || "");
+const listingContractKeys = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id].filter(Boolean).map(String);
+const listingContractKey = listing => listingContractKeys(listing)[0] || "";
 const contractedListingPatch = listing => ({
   status: "done",
   completedDaysAgo: 0,
@@ -43,8 +44,8 @@ const contractedListingPatch = listing => ({
   doneLabel: listing?.dealType === "전세" ? "전세완료" : listing?.dealType === "월세" || listing?.dealType === "임대" ? "임대완료" : "매도완료",
 });
 const applyListingContracts = (list, contracts = {}) => list.map(listing => {
-  const key = listingContractKey(listing);
-  return key && contracts[key] ? { ...listing, ...contractedListingPatch(listing) } : listing;
+  const hasContract = listingContractKeys(listing).some(key => contracts[key]);
+  return hasContract ? { ...listing, ...contractedListingPatch(listing) } : listing;
 });
 const roleAccessFor = (demoRole, accountType) => {
   if (demoRole === "broker" || accountType === "broker") return ["broker", "owner"];
@@ -262,7 +263,7 @@ export default function App() {
   const [properties, setProperties] = useState([]);
   useEffect(() => {
     let alive = true;
-    syncCache(CACHE_KEYS.listingContracts, {}).then(next => {
+    loadListingContracts().then(next => {
       if (!alive || !next || typeof next !== "object" || Array.isArray(next)) return;
       setListingContracts(next);
       setProperties(prev => applyListingContracts(prev, next));
@@ -454,23 +455,10 @@ export default function App() {
       property,
       contractedAt: new Date().toISOString(),
     };
-    const next = { ...base, [key]: contract };
+    const next = await saveListingContract(contract);
     setListingContracts(next);
-    saveCache(CACHE_KEYS.listingContracts, next);
     setProperties(prev => applyListingContracts(prev, next));
-
-    const listing = properties.find(item => listingContractKey(item) === key);
-    if (listing) {
-      const patch = contractedListingPatch(listing);
-      supabase
-        .from("listings")
-        .update(listingPatchToRow(patch))
-        .eq("id", listing.id)
-        .then(({ error }) => {
-          if (error) console.error("Supabase contract listing update error:", error);
-        });
-    }
-    return contract;
+    return next[key] || contract;
   };
   const applyDemoUser = user => {
     setDemoUser(user);

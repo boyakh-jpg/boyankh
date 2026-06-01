@@ -14,6 +14,7 @@ select 'table_counts' as section, jsonb_build_object(
   'contact_requests', (select count(*) from public.contact_requests),
   'chats', (select count(*) from public.chats),
   'chat_messages', (select count(*) from public.chat_messages),
+  'listing_contracts', (select count(*) from public.listing_contracts),
   'profiles', (select count(*) from public.profiles),
   'support_tickets', (select count(*) from public.support_tickets),
   'reports', (select count(*) from public.reports),
@@ -111,6 +112,12 @@ select 'orphan_checks', jsonb_build_object(
     left join public.listings l on l.demo_listing_id = p.listing_id
     where l.demo_listing_id is null
   ),
+  'listing_contracts_without_listing', (
+    select count(*)
+    from public.listing_contracts c
+    left join public.listings l on l.id::text = c.listing_id or l.demo_listing_id = c.listing_id
+    where l.id is null
+  ),
   'direct_proposals_without_buyer', (
     select count(*)
     from public.direct_buyer_proposals p
@@ -128,6 +135,7 @@ select 'null_required_checks', jsonb_build_object(
   'listings_missing_demo_listing_id', (select count(*) from public.listings where owner_key like 'owner-%' and demo_listing_id is null),
   'listings_missing_owner_phone', (select count(*) from public.listings where owner_key like 'owner-%' and coalesce(owner_phone, '') = ''),
   'listings_missing_title', (select count(*) from public.listings where owner_key like 'owner-%' and coalesce(title, complex, '') = ''),
+  'listing_contracts_missing_chat_id', (select count(*) from public.listing_contracts where coalesce(chat_id, '') = ''),
   'chat_messages_missing_body', (select count(*) from public.chat_messages where coalesce(body, '') = '')
 )
 
@@ -149,6 +157,7 @@ and tablename in (
   'contact_requests',
   'chats',
   'chat_messages',
+  'listing_contracts',
   'profiles',
   'support_tickets',
   'reports',
@@ -235,6 +244,22 @@ select 'sample_owner_001_listings', coalesce(jsonb_agg(jsonb_build_object(
 ) order by demo_listing_id), '[]'::jsonb)
 from public.listings
 where owner_key = 'owner-001'
+
+union all
+
+select 'sample_listing_contracts', coalesce(jsonb_agg(jsonb_build_object(
+  'listing_id', listing_id,
+  'chat_id', chat_id,
+  'partner_name', partner_name,
+  'property', property,
+  'contracted_at', contracted_at
+) order by contracted_at desc), '[]'::jsonb)
+from (
+  select *
+  from public.listing_contracts
+  order by contracted_at desc
+  limit 10
+) s
 
 union all
 
