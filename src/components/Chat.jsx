@@ -336,13 +336,13 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
     (role === "owner" && chat.ownerKey && chat.ownerKey !== demoUser.id) ||
     (role === "buyer" && chat.buyerKey && chat.buyerKey !== demoUser.id) ||
     (role === "broker" && chat.brokerKey && chat.brokerKey !== demoUser.id);
-  const decisionKey = chat.contactRequestId || chat.id;
+  const decisionKeys = Array.from(new Set([chat.contactRequestId, storedContext?.contactRequestId, storedContext?.requestId, chat.id].filter(Boolean)));
   const [msgs, setMsgs] = useState(() => baseMessages(chat));
   const [input, setInput] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [localContactDecision, setLocalContactDecision] = useState(() => {
     const cached = loadCache(CACHE_KEYS.contactDecisions, {});
-    return cached && typeof cached === "object" && !Array.isArray(cached) ? cached[decisionKey] || null : null;
+    return cached && typeof cached === "object" && !Array.isArray(cached) ? decisionKeys.map(key => cached[key]).find(Boolean) || null : null;
   });
   const listRef = useRef(null);
   const endRef = useRef(null);
@@ -351,10 +351,10 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
     let alive = true;
     syncCache(CACHE_KEYS.contactDecisions, {}).then(next => {
       if (!alive || !next || typeof next !== "object" || Array.isArray(next)) return;
-      setLocalContactDecision(next[decisionKey] || null);
+      setLocalContactDecision(decisionKeys.map(key => next[key]).find(Boolean) || null);
     });
     return () => { alive = false; };
-  }, [decisionKey]);
+  }, [decisionKeys.join("|")]);
 
   useEffect(() => {
     let alive = true;
@@ -450,9 +450,10 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
     const nextDecision = approved ? "approved" : "rejected";
     setLocalContactDecision(nextDecision);
     const cached = loadCache(CACHE_KEYS.contactDecisions, {});
+    const base = cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {};
     saveCache(CACHE_KEYS.contactDecisions, {
-      ...(cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {}),
-      [decisionKey]: nextDecision,
+      ...base,
+      ...Object.fromEntries(decisionKeys.map(key => [key, nextDecision])),
     });
     appendMessage({
       senderKey: "toad-demo-system",

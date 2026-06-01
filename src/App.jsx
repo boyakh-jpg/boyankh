@@ -448,6 +448,7 @@ export default function App() {
       if (!brokerKey) return;
       saveChatContext({
         id: item.chatId || `listing-${listing.id}-${brokerKey}`,
+        contactRequestId: item.requestId || item.chatId || null,
         listing: listingContext,
         mode: item.activityType || (listing.fast ? "빠른의뢰" : "안심의뢰"),
         brokerKey,
@@ -459,6 +460,7 @@ export default function App() {
     if (!buyerKey) return;
     saveChatContext({
       id: item.chatId || `direct-${listing.id}-${buyerKey}`,
+      contactRequestId: item.requestId || item.chatId || null,
       listing: listingContext,
       mode: item.activityType || "직거래",
       buyerKey,
@@ -583,15 +585,12 @@ export default function App() {
       <div style={{ width: 393, height: 852, flexShrink: 0, background: C.bg, borderRadius: 50, overflow: "hidden", boxShadow: "0 36px 90px rgba(60,90,70,.4)", display: "flex", flexDirection: "column", position: "relative" }}>
         <div style={{ height: 44, background: "transparent", position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 24px", zIndex: 30, pointerEvents: "none" }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: lightHeader ? C.dark : "#fff" }}>9:41</span>
-          {["splash", "login", "role"].includes(screen) ? (
-            <span style={{ width: 30 }}/>
-          ) : screen === "settings" ? (
-            <span style={{ width: 30 }}/>
-          ) : (
-            <button onClick={openSettings} aria-label="설정" style={{ pointerEvents: "auto", width: 30, height: 30, borderRadius: 15, border: "1px solid #ffffff55", background: "#ffffff2e", color: "#fff", fontSize: 17, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0, transform: "translateY(7px)" }}><span style={{ display: "block", transform: "translateY(-1px)" }}>⚙</span></button>
-          )}
+          <span style={{ width: 30 }}/>
         </div>
-        <div ref={contentRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+        <div ref={contentRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", position: "relative" }}>
+          {!["splash", "login", "role", "settings"].includes(screen) && (
+            <button onClick={openSettings} aria-label="설정" style={{ position: "absolute", top: 7, right: 24, zIndex: 30, width: 30, height: 30, borderRadius: 15, border: "1px solid #ffffff55", background: "#ffffff2e", color: "#fff", fontSize: 17, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}><span style={{ display: "block", transform: "translateY(-1px)" }}>⚙</span></button>
+          )}
           {screen === "splash" && <Splash onNext={() => setScreen("login")}/>}
           {screen === "login" && <Login onLogin={type => { setAccountType(type); setScreen("role"); }}/>}
           {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
