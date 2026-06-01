@@ -8,7 +8,7 @@
 ## 현재 상태
 
 - GitHub `main` 기준 작업.
-- 마지막 푸시: `Add address lookup`
+- 마지막 푸시: `Make audit tolerate missing contracts`
 - 사용자는 StackBlitz로 확인한다.
 - 로컬 빌드 검증은 하지 않는다.
 
@@ -44,6 +44,7 @@
 - 매물 등록 주소 입력은 Daum/Kakao 우편번호 주소검색 팝업으로 선택한다.
 - 주소검색 선택값에서 `address`, `zonecode`, `roadAddress`, `jibunAddress`, `region`, `dong`, `complex`를 저장한다.
 - 영어 seed 주소를 한글 주소/지역/동/단지명으로 바꾸는 migration 추가: `202606010003_koreanize_addresses.sql`.
+- `audit_demo_runtime.sql`은 `listing_contracts`가 아직 없어도 `0`/`[]`로 점검 결과를 낸다.
 
 ## 다음 확인
 

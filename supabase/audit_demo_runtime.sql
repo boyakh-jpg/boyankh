@@ -1,5 +1,37 @@
 -- Run this in Supabase SQL Editor and paste the result back to Codex.
 
+create or replace function pg_temp.toad_count(required_table text, sql_text text)
+returns bigint
+language plpgsql
+as $$
+declare
+  value bigint;
+begin
+  if to_regclass(required_table) is null then
+    return 0;
+  end if;
+
+  execute sql_text into value;
+  return coalesce(value, 0);
+end;
+$$;
+
+create or replace function pg_temp.toad_json(required_table text, sql_text text, fallback jsonb)
+returns jsonb
+language plpgsql
+as $$
+declare
+  value jsonb;
+begin
+  if to_regclass(required_table) is null then
+    return fallback;
+  end if;
+
+  execute sql_text into value;
+  return coalesce(value, fallback);
+end;
+$$;
+
 select 'table_counts' as section, jsonb_build_object(
   'demo_users', (select count(*) from public.demo_users),
   'broker_offices', (select count(*) from public.broker_offices),
@@ -14,7 +46,7 @@ select 'table_counts' as section, jsonb_build_object(
   'contact_requests', (select count(*) from public.contact_requests),
   'chats', (select count(*) from public.chats),
   'chat_messages', (select count(*) from public.chat_messages),
-  'listing_contracts', (select count(*) from public.listing_contracts),
+  'listing_contracts', pg_temp.toad_count('public.listing_contracts', 'select count(*) from public.listing_contracts'),
   'profiles', (select count(*) from public.profiles),
   'support_tickets', (select count(*) from public.support_tickets),
   'reports', (select count(*) from public.reports),
@@ -157,10 +189,10 @@ select 'orphan_checks', jsonb_build_object(
     where l.demo_listing_id is null
   ),
   'listing_contracts_without_listing', (
-    select count(*)
-    from public.listing_contracts c
-    left join public.listings l on l.id::text = c.listing_id or l.demo_listing_id = c.listing_id
-    where l.id is null
+    select pg_temp.toad_count(
+      'public.listing_contracts',
+      'select count(*) from public.listing_contracts c left join public.listings l on l.id::text = c.listing_id or l.demo_listing_id = c.listing_id where l.id is null'
+    )
   ),
   'direct_proposals_without_buyer', (
     select count(*)
@@ -179,7 +211,10 @@ select 'null_required_checks', jsonb_build_object(
   'listings_missing_demo_listing_id', (select count(*) from public.listings where owner_key like 'owner-%' and demo_listing_id is null),
   'listings_missing_owner_phone', (select count(*) from public.listings where owner_key like 'owner-%' and coalesce(owner_phone, '') = ''),
   'listings_missing_title', (select count(*) from public.listings where owner_key like 'owner-%' and coalesce(title, complex, '') = ''),
-  'listing_contracts_missing_chat_id', (select count(*) from public.listing_contracts where coalesce(chat_id, '') = ''),
+  'listing_contracts_missing_chat_id', pg_temp.toad_count(
+    'public.listing_contracts',
+    $audit$select count(*) from public.listing_contracts where coalesce(chat_id, '') = ''$audit$
+  ),
   'chat_messages_missing_body', (select count(*) from public.chat_messages where coalesce(body, '') = '')
 )
 
@@ -291,19 +326,25 @@ where owner_key = 'owner-001'
 
 union all
 
-select 'sample_listing_contracts', coalesce(jsonb_agg(jsonb_build_object(
-  'listing_id', listing_id,
-  'chat_id', chat_id,
-  'partner_name', partner_name,
-  'property', property,
-  'contracted_at', contracted_at
-) order by contracted_at desc), '[]'::jsonb)
-from (
-  select *
-  from public.listing_contracts
-  order by contracted_at desc
-  limit 10
-) s
+select 'sample_listing_contracts', pg_temp.toad_json(
+  'public.listing_contracts',
+  $audit$
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'listing_id', listing_id,
+      'chat_id', chat_id,
+      'partner_name', partner_name,
+      'property', property,
+      'contracted_at', contracted_at
+    ) order by contracted_at desc), '[]'::jsonb)
+    from (
+      select *
+      from public.listing_contracts
+      order by contracted_at desc
+      limit 10
+    ) s
+  $audit$,
+  '[]'::jsonb
+)
 
 union all
 
