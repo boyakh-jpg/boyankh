@@ -267,6 +267,12 @@ from (
 
 union all
 
+select 'function_checks', jsonb_build_object(
+  'create_demo_listing_exists', to_regprocedure('public.create_demo_listing(text, jsonb)') is not null
+)
+
+union all
+
 select 'chat_messages_columns', jsonb_object_agg(column_name, data_type order by ordinal_position)
 from information_schema.columns
 where table_schema = 'public'

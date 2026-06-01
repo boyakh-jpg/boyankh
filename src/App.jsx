@@ -69,6 +69,10 @@ const requireAuthUser = async action => {
   }
   return data.user;
 };
+const getAuthUser = async () => {
+  const { data, error } = await supabase.auth.getUser();
+  return error ? null : data?.user || null;
+};
 const LISTING_BASE_COLUMNS = "id,demo_listing_id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo";
 const LISTING_PUBLIC_COLUMNS = `${LISTING_BASE_COLUMNS},owner_phone`;
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
@@ -297,23 +301,27 @@ export default function App() {
   }, [demoUser.id, demoUsers]);
   // 등록 완료 시 새 매물을 목록 맨 앞에 추가 (mine: true → 내 매물)
   const addProperty = async p => {
-    const authUser = await requireAuthUser("insert listing");
-    if (!authUser) return;
-    const insertRow = listingToInsertRow(p, authUser.id, authUser.id);
-    let { data, error } = await supabase
-      .from("listings")
-      .insert(insertRow)
-      .select(LISTING_PUBLIC_COLUMNS)
-      .single();
+    const authUser = await getAuthUser();
+    const ownerKey = demoUser.role === "owner" ? demoUser.id : OWNER_KEY;
+    const insertRow = listingToInsertRow(p, ownerKey, authUser?.id || null);
+    insertRow.demo_listing_id = `user-${Date.now()}`;
+    if (demoUser.phone) insertRow.owner_phone = demoUser.phone;
+    let data = null;
+    let error = null;
 
-    if (error && error.message?.includes("owner_key")) {
-      const fallbackRow = { ...insertRow };
-      delete fallbackRow.owner_key;
+    if (authUser) {
       ({ data, error } = await supabase
         .from("listings")
-        .insert(fallbackRow)
+        .insert(insertRow)
         .select(LISTING_PUBLIC_COLUMNS)
         .single());
+    } else {
+      const result = await supabase.rpc("create_demo_listing", {
+        owner_key_arg: ownerKey,
+        listing_arg: insertRow,
+      });
+      data = result.data;
+      error = result.error;
     }
 
     if (error) {
@@ -322,7 +330,7 @@ export default function App() {
       return;
     }
 
-    setProperties(prev => [{ ...normalizeListing(data, authUser.id), mine: true, ownerKey: authUser.id, ownerLabel: demoUser.label }, ...prev]);
+    setProperties(prev => [{ ...normalizeListing(data, ownerKey), mine: true, ownerKey, ownerLabel: demoUser.label }, ...prev]);
   };
   // 거래 완료/되돌리기 토글
   const setDealDone = async (id, done) => {
