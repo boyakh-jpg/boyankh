@@ -7,6 +7,7 @@ import { Home } from "./components/Home";
 import { Broker } from "./components/Broker";
 import { BrokerOffices } from "./components/BrokerOffices";
 import { BuyerExplore } from "./components/BuyerExplore";
+import { PropertyMap } from "./components/PropertyMap";
 import { ChatList, ChatRoom } from "./components/Chat";
 import { Subscription } from "./components/Subscription";
 import { MyList } from "./components/MyList";
@@ -73,7 +74,8 @@ const getAuthUser = async () => {
   const { data, error } = await supabase.auth.getUser();
   return error ? null : data?.user || null;
 };
-const LISTING_BASE_COLUMNS = "id,demo_listing_id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo";
+const LISTING_BASE_COLUMNS = "id,demo_listing_id,title,price,address,owner_key,region,dong,complex,prop_type,deal_type,price_label,price_num,premium,area,floor,fee,fast,views,status,done_label,completed_days_ago,expires_in_days,created_days_ago,price_history,supply_area,exclusive_area,total_floor,room_count,bath_count,move_in_date,loan,description,maintenance,parking,direction,special,tenant,tenant_end,tenant_deposit,tenant_monthly,tenant_memo,lat,lng";
+const LISTING_LEGACY_COLUMNS = LISTING_BASE_COLUMNS.replace(",lat,lng", "");
 const LISTING_PUBLIC_COLUMNS = `${LISTING_BASE_COLUMNS},owner_phone`;
 const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   id: row.id,
@@ -81,6 +83,8 @@ const normalizeListing = (row, ownerKey = OWNER_KEY) => ({
   mine: row.mine || row.owner_key === ownerKey,
   ownerKey: row.ownerKey || row.owner_key || (row.mine ? ownerKey : null),
   ownerPhone: row.ownerPhone || row.owner_phone || null,
+  lat: row.lat != null ? Number(row.lat) : null,
+  lng: row.lng != null ? Number(row.lng) : null,
   address: row.address || `${row.region || ""} ${row.dong || ""}`.trim(),
   region: row.region || "지역 미입력",
   dong: row.dong || "",
@@ -165,6 +169,8 @@ const listingToInsertRow = (p, ownerKey = OWNER_KEY, userId = null) => ({
   tenant_deposit: p.tenantDeposit,
   tenant_monthly: p.tenantMonthly,
   tenant_memo: p.tenantMemo,
+  lat: p.lat,
+  lng: p.lng,
 });
 const listingPatchToRow = patch => {
   const row = {};
@@ -283,10 +289,10 @@ export default function App() {
         .from("listings")
         .select(LISTING_PUBLIC_COLUMNS);
 
-      if (error && error.message?.includes("owner_phone")) {
+      if (error && ["owner_phone", "lat", "lng"].some(column => error.message?.includes(column))) {
         ({ data, error } = await supabase
           .from("listings")
-          .select(LISTING_BASE_COLUMNS));
+          .select(LISTING_LEGACY_COLUMNS));
       }
 
       if (error) {
@@ -598,7 +604,8 @@ export default function App() {
   const ownerMenus = [{ k: "home", label: "홈" }, { k: "register", label: "의뢰하기" }, { k: "offices", label: "부동산" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }, { k: "mylist", label: "내 매물" }];
   const brokerMenus = [{ k: "home", label: "홈" }, { k: "broker", label: "매물" }, { k: "brokerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }];
   const buyerMenus = [{ k: "home", label: "홈" }, { k: "buyer", label: "매물" }, { k: "buyerViewed", label: "열람목록" }, { k: "chatlist", label: "채팅", badge: chatUnreadCount }];
-  const menus = role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus;
+  const addMapMenu = list => list.some(item => item.k === "map") ? list : [...list.slice(0, 2), { k: "map", label: "지도" }, ...list.slice(2)];
+  const menus = addMapMenu(role === "broker" ? brokerMenus : role === "buyer" ? buyerMenus : ownerMenus);
   const roleLabel = { owner: "소유주", broker: "중개사", buyer: "직거래" };
   const nextRole = availableRoles[(availableRoles.indexOf(role) + 1) % availableRoles.length] || availableRoles[0];
   const noMenu = ["splash", "login", "role", "register", "chatroom"].includes(screen);
@@ -630,6 +637,7 @@ export default function App() {
           {screen === "role" && <Role accountType={accountType} availableRoles={availableRoles} onSelect={r => { setRole(r); setScreen("home"); }}/>}
           {screen === "home" && <Home properties={properties} demoUser={demoUser} brokerOffices={brokerOffices} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} preferredRegion={preferredRegion} interestRegion={interestRegion} brokerTier={brokerTier} onRegister={() => setScreen("register")} onMyList={openMyList} onOffices={() => setScreen("offices")} onBrokerList={openBrokerList} onBuyerList={openBuyerList} onSubscription={() => setScreen("profile")} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "offices" && <BrokerOffices offices={brokerOffices} role={role} availableRoles={availableRoles} preferredRegion={preferredRegion} interestRegion={interestRegion} onSwitchRole={switchRole}/>}
+          {screen === "map" && <PropertyMap role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
           {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} onRecordProposal={recordBrokerProposal} openModal={setModal}/>}

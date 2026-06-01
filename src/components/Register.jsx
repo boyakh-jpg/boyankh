@@ -52,11 +52,23 @@ const expandSidoInAddress = (address, city) => {
   const shortCity = Object.keys(SIDO_LABELS).find(key => SIDO_LABELS[key] === city);
   return shortCity && address.startsWith(`${shortCity} `) ? address.replace(shortCity, city) : address;
 };
+const geocodeAddressOnce = async address => {
+  const endpoint = import.meta.env.VITE_NAVER_GEOCODE_ENDPOINT;
+  if (!endpoint || !address) return null;
+  const url = `${endpoint}${endpoint.includes("?") ? "&" : "?"}query=${encodeURIComponent(address)}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const first = data.addresses?.[0] || data.results?.[0];
+  const lat = Number(first?.y ?? first?.point?.y ?? first?.lat);
+  const lng = Number(first?.x ?? first?.point?.x ?? first?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+};
 
 export function Register({ onDone, onClose, onBack }) {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
-  const [d, setD] = useState({ propType:"", dealType:"", deposit:"", monthly:"", premium:"", address:"", detailAddress:"", zonecode:"", roadAddress:"", jibunAddress:"", city:"", region:"", dong:"", complex:"", supplyArea:"", exclusiveArea:"", area:"", floor:"", totalFloor:"", roomCount:"", bathCount:"", direction:"", duplex:"", moveInDate:"", loan:"", maintenance:"", parking:"", special:"", description:"", tenant:"", tenantEnd:"", tenantDeposit:"", tenantMonthly:"", tenantMemo:"", feeRate:0.4, fastMode:null, directMode:false, certified:false });
+  const [d, setD] = useState({ propType:"", dealType:"", deposit:"", monthly:"", premium:"", address:"", detailAddress:"", zonecode:"", roadAddress:"", jibunAddress:"", city:"", region:"", dong:"", complex:"", lat:null, lng:null, supplyArea:"", exclusiveArea:"", area:"", floor:"", totalFloor:"", roomCount:"", bathCount:"", direction:"", duplex:"", moveInDate:"", loan:"", maintenance:"", parking:"", special:"", description:"", tenant:"", tenantEnd:"", tenantDeposit:"", tenantMonthly:"", tenantMemo:"", feeRate:0.4, fastMode:null, directMode:false, certified:false });
   const [cs, setCs] = useState(0);
   const [code, setCode] = useState("");
   const [addressError, setAddressError] = useState("");
@@ -97,7 +109,12 @@ export function Register({ onDone, onClose, onBack }) {
             region: pickRegion(data),
             dong: pickDong(data),
             complex: pickComplex(data),
+            lat: null,
+            lng: null,
           }));
+          geocodeAddressOnce(baseAddress).then(coords => {
+            if (coords) setD(p => p.address === baseAddress ? { ...p, ...coords } : p);
+          });
         },
       }).open({ q: d.address || undefined, popupTitle: "주소 찾기" });
     } catch {
@@ -150,6 +167,8 @@ export function Register({ onDone, onClose, onBack }) {
       id: "u" + Date.now(),
       region: regionMatch, dong: dongMatch,
       address: fullAddress(d.address, d.detailAddress),
+      lat: d.lat,
+      lng: d.lng,
       detailAddress: d.detailAddress,
       zonecode: d.zonecode,
       roadAddress: d.roadAddress,
