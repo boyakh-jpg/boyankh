@@ -335,20 +335,42 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const [loaded, setLoaded] = useState(false);
   const [readyError, setReadyError] = useState("");
+  const [zoom, setZoom] = useState(12);
   const col = tone === "gold" ? C.gold : C.green;
   const ink = tone === "gold" ? C.goldInk : C.greenInk;
   const mappedItems = items
     .map(item => ({ ...item, lat: Number(item.lat), lng: Number(item.lng) }))
     .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
+  const groupLevel = zoom <= 10 ? "region" : zoom <= 13 ? "dong" : "complex";
+  const groups = Object.values(mappedItems.reduce((acc, item) => {
+    const label = groupLevel === "region"
+      ? (item.region || "지역 미분류")
+      : groupLevel === "dong"
+        ? [item.region, item.dong].filter(Boolean).join(" ")
+        : (item.complex || item.title || "단지 미분류");
+    const key = `${groupLevel}:${label}`;
+    const current = acc[key] || { key, label, level: groupLevel, ids: [], count: 0, lat: 0, lng: 0 };
+    current.ids.push(item.id);
+    current.count += 1;
+    current.lat += item.lat;
+    current.lng += item.lng;
+    acc[key] = current;
+    return acc;
+  }, {})).map(group => ({ ...group, lat: group.lat / group.count, lng: group.lng / group.count }));
   const itemKey = mappedItems.map(item => `${item.id}:${item.lat}:${item.lng}`).join("|");
+  const groupKey = groups.map(group => `${group.key}:${group.count}`).join("|");
 
   useEffect(() => {
+    if (!loaded) return undefined;
     let alive = true;
     loadNaverMiniMap()
       .then(maps => {
         if (!alive || !mapEl.current) return;
+        if (activeId && !groups.some(group => group.key === activeId)) onPick && onPick(null);
         const centerItem = mappedItems[0] || { lat: 37.5665, lng: 126.9780 };
+        const isNewMap = !mapRef.current;
         const map = mapRef.current || new maps.Map(mapEl.current, {
           center: new maps.LatLng(centerItem.lat, centerItem.lng),
           zoom: mappedItems.length > 1 ? 12 : 15,
@@ -359,28 +381,31 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
         });
         mapRef.current = map;
         markersRef.current.forEach(marker => marker.setMap(null));
-        markersRef.current = mappedItems.map(item => {
-          const selected = activeId === item.id;
+        markersRef.current = groups.map(group => {
+          const selected = activeId === group.key;
           const marker = new maps.Marker({
-            position: new maps.LatLng(item.lat, item.lng),
+            position: new maps.LatLng(group.lat, group.lng),
             map,
-            title: item.title || item.complex || item.dong || "매물",
+            title: group.label,
             icon: {
-              content: `<div style="background:${selected ? col : "#fff"};color:${selected ? "#fff" : ink};border:2px solid ${col};border-radius:14px;padding:4px 9px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 3px 8px rgba(80,110,90,.25);">${item.dong || item.region || "매물"}</div>`,
-              anchor: new maps.Point(20, 28),
+              content: `<div style="background:${selected ? col : "#fff"};color:${selected ? "#fff" : ink};border:2px solid ${col};border-radius:16px;padding:5px 10px;font-size:11px;font-weight:900;white-space:nowrap;box-shadow:0 3px 8px rgba(80,110,90,.25);">${group.label} ${group.count}</div>`,
+              anchor: new maps.Point(28, 30),
             },
           });
-          maps.Event.addListener(marker, "click", () => onPick && onPick(item.id));
+          maps.Event.addListener(marker, "click", () => onPick && onPick(group));
           return marker;
         });
-        if (mappedItems.length > 1) {
+        if (isNewMap && mappedItems.length > 1) {
           const bounds = new maps.LatLngBounds();
           mappedItems.forEach(item => bounds.extend(new maps.LatLng(item.lat, item.lng)));
           map.fitBounds(bounds);
-        } else if (mappedItems[0]) {
+        } else if (isNewMap && mappedItems[0]) {
           map.setCenter(new maps.LatLng(mappedItems[0].lat, mappedItems[0].lng));
           map.setZoom(15);
         }
+        if (isNewMap) maps.Event.addListener(map, "idle", () => {
+          if (alive) setZoom(map.getZoom());
+        });
       })
       .catch(() => setReadyError("네이버 지도 인증을 확인하세요"));
     return () => {
@@ -388,7 +413,16 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
     };
-  }, [itemKey, activeId, col, ink, onPick]);
+  }, [loaded, itemKey, groupKey, activeId, col, ink, onPick]);
+
+  if (!loaded) {
+    return (
+      <div style={{ position: "relative", width: "100%", height: 180, borderRadius: 18, overflow: "hidden", boxShadow: SH2, background: "linear-gradient(160deg,#EAF3ED 0%,#E0EEE6 100%)", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+        <button onClick={() => setLoaded(true)} style={{ border: `1.5px solid ${col}`, background: "#fff", color: ink, borderRadius: 16, padding: "12px 18px", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: SH1 }}>지도 표시</button>
+        <div style={{ position: "absolute", bottom: 8, right: 10, fontSize: 10, color: C.gray, background: "#ffffffdd", padding: "2px 8px", borderRadius: 10 }}>누를 때만 지도 로드</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative", width: "100%", height: 180, borderRadius: 18, overflow: "hidden", boxShadow: SH2, background: "#E8EFEA", marginBottom: 14 }}>

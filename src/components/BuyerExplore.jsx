@@ -70,6 +70,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   const [sort, setSort] = useState(preset.sort || "최신순");
   const [statusFilter, setStatusFilter] = useState(preset.statusFilter || "거래중만 보기"); // 기본: 거래중인 매물만
   const [activeId, setActiveId] = useState(null);
+  const [activeMapGroup, setActiveMapGroup] = useState(null);
   const [selected, setSelected] = useState(null);
   const [listMode, setListMode] = useState(menuMode);
   const [filterOpen, setFilterOpen] = useState(menuMode !== "viewed");
@@ -180,13 +181,15 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   else if (appliedFilters.sort === "인기순") list = [...list].sort((a, b) => b.views - a.views);
   else if (appliedFilters.sort === "추이 상승순") list = [...list].sort((a, b) => priceChangeRate(b) - priceChangeRate(a));
   else if (appliedFilters.sort === "추이 하락순") list = [...list].sort((a, b) => priceChangeRate(a) - priceChangeRate(b));
-  const activePin = activeId && list.some(p => p.id === activeId) ? activeId : null;
-  const visibleList = list;
+  const activePin = activeMapGroup && activeMapGroup.ids?.some(id => list.some(p => p.id === id)) ? activeMapGroup : null;
+  const activePinIds = activePin ? new Set(activePin.ids) : null;
+  const visibleList = activePinIds ? list.filter(p => activePinIds.has(p.id)).slice(0, 20) : list;
   const hasFilter = appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.priceMin > 0 || appliedFilters.priceMax < maxListPrice || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
   const hasPendingFilters = appliedFilters.region !== region || appliedFilters.dong !== dong || appliedFilters.priceMin !== priceMin || appliedFilters.priceMax !== priceMax || appliedFilters.sort !== sort || appliedFilters.statusFilter !== statusFilter || appliedFilters.hideViewed !== hideViewed || appliedFilters.listMode !== listMode || !sameValues(appliedFilters.ptypes, ptypes) || !sameValues(appliedFilters.dealTypes, dealTypes);
   const applyFilters = () => {
     setAppliedFilters({ regionGroup: [...regionGroup], region, dong, ptypes: [...ptypes], dealTypes: [...dealTypes], priceMin, priceMax, sort, statusFilter, hideViewed, listMode });
     setActiveId(null);
+    setActiveMapGroup(null);
   };
   const toggleFavoriteFilter = () => {
     const nextMode = listMode === "favorite" ? menuMode : "favorite";
@@ -194,16 +197,18 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
     if (isViewedMenu) {
       setAppliedFilters(f => ({ ...f, listMode: nextMode }));
       setActiveId(null);
+      setActiveMapGroup(null);
     }
   };
   const favoriteFilterLabel = listMode === "favorite" ? "전체리스트 보기" : "즐겨찾기만 보기";
-  const pickPin = id => {
-    const picked = properties.find(p => p.id === id);
-    setActiveId(id === activeId ? null : id);
-    if (!picked) return;
-    setRegionGroup([]);
-    setRegion(picked.region);
-    setDong(picked.dong || "전체");
+  const pickPin = group => {
+    if (!group?.key) {
+      setActiveMapGroup(null);
+      setActiveId(null);
+      return;
+    }
+    setActiveMapGroup(activePin?.key === group.key ? null : group);
+    setActiveId(null);
   };
   const resetFilters = () => {
     const nextFilters = { regionGroup: [], region: "전체", dong: "전체", ptypes: [], dealTypes: [], priceMin: 0, priceMax: maxListPrice, sort: "최신순", statusFilter: "거래중만 보기", hideViewed: true, listMode: menuMode };
@@ -220,6 +225,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
     setListMode(menuMode);
     setAppliedFilters(nextFilters);
     setActiveId(null);
+    setActiveMapGroup(null);
   };
 
   const selectedListing = properties.find(p => p.id === selected);
@@ -272,6 +278,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
     setFilterOpen(menuMode !== "viewed");
     setAppliedFilters(f => ({ ...f, listMode: menuMode }));
     setActiveId(null);
+    setActiveMapGroup(null);
   }, [menuMode]);
 
   const DetailSheet = ({ listing }) => {
@@ -362,7 +369,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   const Card = p => {
     const open = unlocked[p.id] || proposalStatus(p) === "열람";
     const requested = requests[p.id] === "pending" || proposalStatus(p) === "안심의뢰";
-    const hi = activePin === p.id;
+    const hi = activePinIds?.has(p.id);
     const done = isDone(p);
     const expired = isTermExpired(p);
     const left = daysLeft(p);
@@ -437,7 +444,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
         </div>
       </div>
       <div style={{ padding: "16px 16px 0" }}>
-        {(!isViewedMenu || filterOpen) && <MiniMap items={list} activeId={activePin} onPick={pickPin} tone="gold"/>}
+        {(!isViewedMenu || filterOpen) && <MiniMap items={list} activeId={activePin?.key} onPick={pickPin} tone="gold"/>}
         {isViewedMenu && (
           <button onClick={() => setFilterOpen(v => !v)} style={{ border: "none", background: "transparent", color: C.goldInk, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", padding: "0 2px 8px", marginTop: -2 }}>{filterOpen ? "필터창 숨기기" : "필터창 보이기"}</button>
         )}
@@ -529,7 +536,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
           </div>
         )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <div style={{ fontSize: 13, color: C.gray }}>총 {visibleList.length}건{activePin && <span> · 핀 선택됨</span>}</div>
+          <div style={{ fontSize: 13, color: C.gray }}>총 {visibleList.length}건{activePin && <span> · {activePin.label} 선택됨</span>}</div>
           {!isViewedMenu && (hasFilter || hasPendingFilters) && <button onClick={resetFilters} style={{ border: `1px solid ${C.line}`, background: "#fff", color: C.goldInk, borderRadius: 12, padding: "6px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>필터 해제</button>}
         </div>
         {visibleList.map(Card)}
