@@ -335,6 +335,7 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const fitKeyRef = useRef("");
   const [loaded, setLoaded] = useState(false);
   const [readyError, setReadyError] = useState("");
   const [zoom, setZoom] = useState(12);
@@ -355,17 +356,17 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
       key: `listing:${item.id}`,
       label: item.complex || item.title || "매물",
       level: "listing",
+      region: item.region || "",
+      dong: item.dong || "",
       ids: [item.id],
       count: 1,
       lat: item.lat + Math.sin(angle) * radius,
       lng: item.lng + Math.cos(angle) * radius,
     };
   }) : Object.values(mappedItems.reduce((acc, item) => {
-    const label = groupLevel === "region"
-      ? (item.region || "지역 미분류")
-      : (item.dong || "동 미분류");
-    const key = `${groupLevel}:${label}`;
-    const current = acc[key] || { key, label, level: groupLevel, ids: [], count: 0, lat: 0, lng: 0 };
+    const label = groupLevel === "region" ? (item.region || "지역 미분류") : (item.dong || "동 미분류");
+    const key = groupLevel === "region" ? `region:${item.region || ""}` : `dong:${item.region || ""}:${item.dong || ""}`;
+    const current = acc[key] || { key, label, level: groupLevel, region: item.region || "", dong: groupLevel === "dong" ? item.dong || "" : "전체", ids: [], count: 0, lat: 0, lng: 0 };
     current.ids.push(item.id);
     current.count += 1;
     current.lat += item.lat;
@@ -409,11 +410,14 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
           maps.Event.addListener(marker, "click", () => onPick && onPick(group));
           return marker;
         });
-        if (isNewMap && mappedItems.length > 1) {
+        const shouldFit = !activeId && (isNewMap || fitKeyRef.current !== itemKey);
+        if (shouldFit && mappedItems.length > 1) {
+          fitKeyRef.current = itemKey;
           const bounds = new maps.LatLngBounds();
           mappedItems.forEach(item => bounds.extend(new maps.LatLng(item.lat, item.lng)));
           map.fitBounds(bounds);
-        } else if (isNewMap && mappedItems[0]) {
+        } else if (shouldFit && mappedItems[0]) {
+          fitKeyRef.current = itemKey;
           map.setCenter(new maps.LatLng(mappedItems[0].lat, mappedItems[0].lng));
           map.setZoom(15);
         }

@@ -252,6 +252,12 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
       setActiveId(null);
       return;
     }
+    const nextRegion = group.region || (group.level === "region" ? group.label : "전체");
+    const nextDong = group.level === "region" ? "전체" : group.dong || "전체";
+    setRegionGroup([]);
+    setRegion(nextRegion);
+    setDong(nextDong);
+    setAppliedFilters(f => ({ ...f, regionGroup: [], region: nextRegion, dong: nextDong }));
     setActiveMapGroup(activePin?.key === group.key ? null : group);
     setActiveId(null);
   };
