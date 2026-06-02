@@ -126,8 +126,6 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
   const markViewed = id => updateStoredMap("brokerViewed", setViewed, v => v[id] ? v : ({ ...v, [id]: "방금" }));
   const markContacted = id => updateStoredMap("brokerContacted", setContacted, c => ({ ...c, [id]: true }));
   const markSafeRequest = (id, status) => updateStoredMap("brokerSafeRequests", setSafeRequests, r => ({ ...r, [id]: status }));
-  const safeDecisionKey = listing => `listing-${listing.id}-${demoUser.id}`;
-  const safeApproved = listing => contactDecisions?.[safeDecisionKey(listing)] === "approved";
   const listingKeys = listing => [listing?.id, listing?.demoListingId, listing?.demo_listing_id].filter(v => v != null).map(String);
   const proposalMatchesListing = (proposal, listing) => listingKeys(listing).includes(String(proposal?.listingId || ""));
   const proposalForListing = listing => brokerProposals.find(proposal =>
@@ -136,15 +134,24 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
   );
   const proposalStatus = listing => proposalForListing(listing)?.activityType || null;
   const hasBrokerProposal = listing => !!proposalForListing(listing);
-  const proposalDecisionKeyFor = listing => {
+  const decisionKeysFor = listing => {
     const proposal = proposalForListing(listing);
-    return proposal?.requestId || proposal?.chatId || null;
+    const listingId = listing?.demoListingId || listing?.demo_listing_id || listing?.id;
+    return [
+      proposal?.requestId,
+      proposal?.chatId,
+      proposal?.id,
+      `broker-${listingId}-${demoUser.id}`,
+      `listing-${listing?.id}-${demoUser.id}`,
+    ].filter(Boolean).map(String);
   };
-  const proposalApproved = listing => {
-    const key = proposalDecisionKeyFor(listing);
-    return !!key && contactDecisions?.[key] === "approved";
+  const contactDecision = listing => decisionKeysFor(listing).map(key => contactDecisions?.[key]).find(Boolean) || null;
+  const proposalApproved = listing => contactDecision(listing) === "approved";
+  const hasBrokerActivity = listing => {
+    const decision = contactDecision(listing);
+    return !!viewed[listing.id] || !!contacted[listing.id] || !!safeRequests[listing.id] || hasBrokerProposal(listing) || !!decision;
   };
-  const contactOpen = listing => listing.fast ? (!!contacted[listing.id] || proposalStatus(listing) === "빠른의뢰") : (safeApproved(listing) || proposalApproved(listing));
+  const contactOpen = listing => listing.fast ? (!!contacted[listing.id] || proposalStatus(listing) === "빠른의뢰") : proposalApproved(listing);
   const toggleFavorite = id => updateStoredMap("brokerFavorites", setFavorites, v => ({ ...v, [id]: !v[id] }));
   const matchesPresetRegion = p => region === "전체" ? true : p.region === region;
   const matchesAppliedRegion = p => appliedFilters.region === "전체" ? true : p.region === appliedFilters.region;
@@ -213,9 +220,9 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
   const isViewedMenu = menuMode === "viewed";
   const viewTone = { page: G.pageBg, header: G.header, chip: "#ffffff2e" };
   const inListScope = p => {
-    if (isViewedMenu) return (viewed[p.id] || hasBrokerProposal(p)) && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
+    if (isViewedMenu) return hasBrokerActivity(p) && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
     if (appliedFilters.listMode === "favorite") return favorites[p.id];
-    return !appliedFilters.hideViewed || !(contacted[p.id] || hasBrokerProposal(p));
+    return !appliedFilters.hideViewed || !hasBrokerActivity(p);
   };
   const isListEligible = p => isDone(p) || p.status === "active";
   // 필터 + 정렬 (기본은 거래중, 완료 매물은 별도 필터에서 30일 보관)
@@ -314,6 +321,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
     const insufficient = points < cost;
     const badge = leaseBadge(listing);
     const favorite = !!favorites[listing.id];
+    const decision = contactDecision(listing);
     return (
       <div onClick={closeDetail} style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(393px, 100vw)", height: "min(852px, 100vh)", background: "#2A3A3255", zIndex: 999, display: "flex", alignItems: "flex-end", borderRadius: 50, overflow: "hidden", animation: "fadeIn .2s" }}>
         <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "86%", overflowY: "auto", background: G.pageBg, borderRadius: "26px 26px 0 0", padding: "20px 18px 108px", boxSizing: "border-box", animation: "sheetUp .3s " + spring }}>
@@ -379,6 +387,8 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>거래 완료된 매물</div>
           ) : expired ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
+          ) : decision === "rejected" ? (
+            <button onClick={() => openChatFromDetail(listing)} style={{ width: "100%", padding: "14px 0", background: "#F2F4F3", border: "none", borderRadius: 14, color: C.gray, fontWeight: 900, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>거절됨 · 포인트 자동 환불 · 채팅보기</button>
           ) : contactOpen(listing) ? (
             <ContactOpenBox listing={listing}/>
           ) : (contacted[listing.id] || hasBrokerProposal(listing)) ? (
@@ -400,6 +410,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
     const insufficient = points < cost;
     const badge = leaseBadge(l);
     const favorite = !!favorites[l.id];
+    const decision = contactDecision(l);
     return (
       <div key={l.id} onClick={() => openDetail(l.id)} style={{ background: G.card, borderRadius: 20, padding: 18, marginBottom: 12, boxShadow: hi?"0 0 0 2px "+C.green+", "+SH1:SH1, transition: "box-shadow .2s", opacity: done?0.78:1, cursor: "pointer" }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -407,7 +418,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
             <span style={{ fontSize: 11, color: C.gray }}>{updateLabel(l)}</span>
             {done ? <DoneBadge label={l.doneLabel}/> : (l.badge && <Tag tone={l.badge==="NEW"?"green":"gold"}>{l.badge}</Tag>)}
             {badge && <Tag tone="gold">{badge}</Tag>}
-            {!done && (contacted[l.id] || hasBrokerProposal(l) || contactOpen(l)) && <ContactBadge label={contactOpen(l) ? "연락처 공개" : "승인 대기"} tone={l.fast ? "gold" : "green"}/>}
+            {!done && (contacted[l.id] || hasBrokerProposal(l) || contactOpen(l) || decision) && <ContactBadge label={decision === "rejected" ? "거절됨" : contactOpen(l) ? "연락처 공개" : "승인 대기"} tone={l.fast ? "gold" : "green"}/>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <button onClick={(e) => { e.stopPropagation(); toggleFavorite(l.id); }} style={{ width: 28, height: 28, borderRadius: 14, border: `1px solid ${favorite ? C.gold : C.line}`, background: favorite ? G.goldSoft : "#fff", color: favorite ? C.goldInk : C.gray, fontSize: 15, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 }}>{favorite ? "★" : "☆"}</button>
@@ -430,6 +441,8 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
           </div>
         ) : expired ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "11px 14px", textAlign: "center", color: "#7B8580", fontWeight: 700, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 조회 불가</div>
+        ) : decision === "rejected" ? (
+          <div onClick={(e) => { e.stopPropagation(); onOpenChat && onOpenChat(l); }} style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 0", textAlign: "center", color: C.gray, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>거절됨 · 포인트 자동 환불 · 채팅보기</div>
         ) : contactOpen(l) ? (
           <ContactOpenBox listing={l}/>
         ) : (contacted[l.id] || hasBrokerProposal(l)) ? (

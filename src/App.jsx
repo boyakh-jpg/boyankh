@@ -535,13 +535,22 @@ export default function App() {
       return next;
     });
   };
-  const openBrokerListingChat = listing => openChat({
-    id: `listing-${listing.id}-${demoUser.id}`,
-    listing: listingWithOwner(listing),
-    mode: listing.fast ? "빠른의뢰" : "안심의뢰",
-    brokerKey: demoUser.id,
-    brokerName: demoUser.label,
-  });
+  const brokerProposalForListing = listing => brokerProposals.find(item =>
+    [item.brokerUserId, item.brokerKey, item.brokerOfficeId].filter(Boolean).map(String).includes(String(demoUser.id)) &&
+    listingKeys(listing).includes(String(item.listingId || ""))
+  );
+  const openBrokerListingChat = listing => {
+    const proposal = brokerProposalForListing(listing);
+    const listingId = listing.demoListingId || listing.demo_listing_id || listing.id;
+    openChat({
+      id: proposal?.chatId || `listing-${listing.id}-${demoUser.id}`,
+      contactRequestId: proposal?.requestId || `broker-${listingId}-${demoUser.id}`,
+      listing: listingWithOwner(listing),
+      mode: listing.fast ? "빠른의뢰" : "안심의뢰",
+      brokerKey: demoUser.id,
+      brokerName: demoUser.label,
+    });
+  };
   const directProposalForListing = listing => directBuyerProposals.find(item =>
     [item.buyerUserId, item.buyerKey].filter(Boolean).map(String).includes(String(demoUser.id)) &&
     listingKeys(listing).includes(String(item.listingId || ""))
