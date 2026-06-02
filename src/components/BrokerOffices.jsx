@@ -82,7 +82,10 @@ export function BrokerOffices({ offices = BROKER_OFFICES, role = "owner", availa
   const [region, setRegion] = useState("전체");
   const [dong, setDong] = useState("전체");
   const [selected, setSelected] = useState(null);
-  const officeDong = o => (o.address.split(" ")[2] || "").trim();
+  const officeDong = o => {
+    const address = o.address || "";
+    return (o.dong || address.split(" ").find(part => /(동|읍|면|가)$/.test(part)) || address.split(" ")[2] || "").trim();
+  };
   const matchesRegion = o => region === "전체" ? (!regionGroup.length || o.specialtyRegions.some(r => regionGroup.includes(r))) : o.specialtyRegions.includes(region);
   const tierScore = o => {
     const tier = o.tier || "";

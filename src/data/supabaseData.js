@@ -32,7 +32,11 @@ const normalizeOffice = row => ({
   licenseNo: row.license_no,
   address: row.address,
   phone: row.phone,
+  city: row.city || (row.address || "").split(" ")[0] || "",
   region: row.region,
+  dong: row.dong || (row.address || "").split(" ").find(part => /(동|읍|면|가)$/.test(part)) || (row.address || "").split(" ")[2] || "",
+  lat: row.lat,
+  lng: row.lng,
   specialtyRegions: row.specialty_regions || [],
   specialtyTypes: (row.specialty_types || []).map(normalizePropType),
   verifiedDeals12m: row.verified_deals_12m || 0,
@@ -83,21 +87,32 @@ const normalizeDirectBuyer = row => ({
   when: whenFrom(row.created_at),
 });
 
-const safeSelect = async (table, columns) => {
+const safeSelect = async (table, columns, fallbackColumns = null) => {
   try {
     const { data, error } = await supabase.from(table).select(columns);
     if (error) throw error;
     return asArray(data);
   } catch (error) {
+    if (fallbackColumns) {
+      try {
+        const { data, error: fallbackError } = await supabase.from(table).select(fallbackColumns);
+        if (fallbackError) throw fallbackError;
+        return asArray(data);
+      } catch (fallbackError) {
+        console.error(`Supabase ${table} fallback load error:`, fallbackError);
+      }
+    }
     console.error(`Supabase ${table} load error:`, error);
     return [];
   }
 };
 
 export async function loadDemoEnvironment() {
+  const brokerOfficeColumns = "id,broker_user_id,office_name,agent_name,license_no,address,phone,city,region,dong,lat,lng,specialty_regions,specialty_types,verified_deals_12m,percentile_in_region,tier,review_count,response_mode,business_hours,last_active,proposal_message,reviews";
+  const brokerOfficeLegacyColumns = "id,broker_user_id,office_name,agent_name,license_no,address,phone,region,specialty_regions,specialty_types,verified_deals_12m,percentile_in_region,tier,review_count,response_mode,business_hours,last_active,proposal_message,reviews";
   const [users, offices, brokerProposals, directBuyerProposals] = await Promise.all([
     safeSelect("demo_users", "id,role,name,label,description,region,phone"),
-    safeSelect("broker_offices", "id,broker_user_id,office_name,agent_name,license_no,address,phone,region,specialty_regions,specialty_types,verified_deals_12m,percentile_in_region,tier,review_count,response_mode,business_hours,last_active,proposal_message,reviews"),
+    safeSelect("broker_offices", brokerOfficeColumns, brokerOfficeLegacyColumns),
     safeSelect("broker_proposals", "id,owner_key,listing_id,broker_office_id,activity_type,proposal_new,request_id,chat_id,listing_title,created_at"),
     safeSelect("direct_buyer_proposals", "id,owner_key,buyer_user_id,listing_id,name,note,budget,activity_type,proposal_new,request_id,chat_id,listing_title,created_at"),
   ]);
