@@ -431,8 +431,10 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
   const contractedElsewhere = !!listingContract && !contractedHere;
   const expired = !!chat.expired || !!listingContract;
   const canContractListing = role === "owner" && !chat.demo && !isDirect && !!chatListingId;
+  const contactRejected = localContactDecision === "rejected";
+  const canSendMessage = !expired && !contactRejected;
   const send = () => {
-    if (expired) return;
+    if (!canSendMessage) return;
     const text = input.trim();
     if (!text) return;
     setInput("");
@@ -600,8 +602,8 @@ export function ChatRoom({ chatId, chatContext = null, role, listingContracts = 
       <button onClick={() => listRef.current?.scrollTo({ top: 0, behavior: "smooth" })} aria-label="채팅 맨 위로" style={{ position: "absolute", left: "50%", bottom: 18, transform: "translateX(-50%)", width: 42, height: 42, borderRadius: 21, border: `1px solid rgba(205,216,208,.42)`, background: "rgba(255,255,255,.38)", color: "rgba(69,126,92,.58)", fontSize: 18, fontWeight: 900, cursor: "pointer", zIndex: 8, boxShadow: "0 8px 20px rgba(60,90,70,.10)", fontFamily: "inherit", backdropFilter: "blur(6px)" }}>↑</button>
       </div>
       <div style={{ flexShrink: 0, padding: "10px 14px", background: "#fff", borderTop: `1px solid ${C.line}`, display: "flex", gap: 8, alignItems: "center" }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={expired ? "만료된 의뢰는 메시지를 보낼 수 없어요" : "메시지 입력..."} disabled={expired} style={{ flex: 1, padding: "12px 16px", borderRadius: 22, border: `1.5px solid ${C.line}`, fontSize: 14, fontFamily: "inherit", outline: "none", background: expired ? "#F2F4F3" : G.bg, color: expired ? C.gray : C.dark }}/>
-        <button onClick={send} disabled={expired} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: expired ? "#D5DDD7" : G.header, color: "#fff", fontSize: 20, cursor: expired ? "default" : "pointer", flexShrink: 0, fontFamily: "inherit", lineHeight: 1 }}>↵</button>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={expired ? "만료된 의뢰는 메시지를 보낼 수 없어요" : contactRejected ? "거절된 요청은 채팅할 수 없어요" : "메시지 입력..."} disabled={!canSendMessage} style={{ flex: 1, padding: "12px 16px", borderRadius: 22, border: `1.5px solid ${C.line}`, fontSize: 14, fontFamily: "inherit", outline: "none", background: canSendMessage ? G.bg : "#F2F4F3", color: canSendMessage ? C.dark : C.gray }}/>
+        <button onClick={send} disabled={!canSendMessage} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: canSendMessage ? G.header : "#D5DDD7", color: "#fff", fontSize: 20, cursor: canSendMessage ? "pointer" : "default", flexShrink: 0, fontFamily: "inherit", lineHeight: 1 }}>↵</button>
       </div>
     </div>
   );

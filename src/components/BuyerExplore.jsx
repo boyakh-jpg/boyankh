@@ -395,6 +395,8 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>거래 완료된 매물</div>
           ) : expired ? (
             <div style={{ background: "#F2F4F3", borderRadius: 14, padding: "13px 14px", textAlign: "center", color: "#7B8580", fontWeight: 800, fontSize: 13 }}>매물 의뢰가 만료됐어요 · 연락처 요청 불가</div>
+          ) : contactDecision === "rejected" ? (
+            <div style={{ width: "100%", padding: "14px 0", background: "#F2F4F3", borderRadius: 14, color: C.gray, fontWeight: 900, fontSize: 14, textAlign: "center" }}>거절됨 · 포인트 자동 환불 · 채팅 불가</div>
           ) : open ? (
             <ContactOpenBox listing={listing}/>
           ) : requested ? (
@@ -435,6 +437,8 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#7B8580", fontWeight: 700, textAlign: "center" }}>거래 완료된 매물 · {left === 0 ? "오늘 목록에서 사라져요" : `${left}일 후 사라져요`}</div>
         ) : expired ? (
           <div style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#7B8580", fontWeight: 700, textAlign: "center" }}>매물 의뢰가 만료됐어요 · 연락처 요청 불가</div>
+        ) : contactDecision === "rejected" ? (
+          <div onClick={e => e.stopPropagation()} style={{ background: "#F2F4F3", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: C.gray, fontWeight: 800, textAlign: "center" }}>거절됨 · 포인트 자동 환불 · 채팅 불가</div>
         ) : open ? (
           <ContactOpenBox listing={p}/>
         ) : requested ? (
