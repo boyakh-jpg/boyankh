@@ -468,7 +468,8 @@ export default function App() {
       id: item.chatId || `direct-${listing.id}-${buyerKey}`,
       contactRequestId: item.requestId || item.chatId || null,
       listing: listingContext,
-      mode: item.activityType || "직거래",
+      mode: "직거래",
+      activityType: item.activityType || "직거래",
       buyerKey,
       buyerName: item.name || "직거래 매수자",
     });
@@ -505,6 +506,35 @@ export default function App() {
       return next;
     });
   };
+  const recordDirectBuyerProposal = ({ listing, activityType }) => {
+    if (!listing || demoUser.role !== "buyer") return;
+    const listingId = listing.demoListingId || listing.demo_listing_id || listing.id;
+    const requestId = `direct-${listingId}-${demoUser.id}`;
+    const chatId = `direct-${listing.id}-${demoUser.id}`;
+    const nextItem = {
+      id: requestId,
+      ownerKey: listing.ownerKey || listing.owner_key || null,
+      listingId,
+      buyerUserId: demoUser.id,
+      buyerKey: demoUser.id,
+      name: demoUser.label,
+      note: activityType === "열람" ? "직거래 연락처 열람" : "직거래 연락처 공개 요청",
+      budget: listing.price || "",
+      activityType,
+      proposalNew: true,
+      requestId,
+      chatId,
+      listingTitle: `${listing.region || ""} ${listing.dong || ""} ${listing.complex || ""}`.trim(),
+      when: "방금",
+    };
+    setDirectBuyerProposals(current => {
+      const rest = current.filter(item => item.requestId !== requestId && item.chatId !== chatId);
+      const previous = current.find(item => item.requestId === requestId || item.chatId === chatId);
+      const next = [{ ...previous, ...nextItem }, ...rest];
+      saveCache(CACHE_KEYS.buyerProposals, next.filter(item => String(item.id || "").startsWith("direct-")));
+      return next;
+    });
+  };
   const openBrokerListingChat = listing => openChat({
     id: `listing-${listing.id}-${demoUser.id}`,
     listing: listingWithOwner(listing),
@@ -512,13 +542,22 @@ export default function App() {
     brokerKey: demoUser.id,
     brokerName: demoUser.label,
   });
-  const openDirectListingChat = listing => openChat({
-    id: `direct-${listing.id}-${demoUser.id}`,
-    listing: listingWithOwner(listing),
-    mode: "직거래",
-    buyerKey: demoUser.id,
-    buyerName: demoUser.label,
-  });
+  const directProposalForListing = listing => directBuyerProposals.find(item =>
+    [item.buyerUserId, item.buyerKey].filter(Boolean).map(String).includes(String(demoUser.id)) &&
+    listingKeys(listing).includes(String(item.listingId || ""))
+  );
+  const openDirectListingChat = listing => {
+    const proposal = directProposalForListing(listing);
+    openChat({
+      id: proposal?.chatId || `direct-${listing.id}-${demoUser.id}`,
+      contactRequestId: proposal?.requestId || proposal?.chatId || null,
+      listing: listingWithOwner(listing),
+      mode: "직거래",
+      activityType: proposal?.activityType || "직거래",
+      buyerKey: demoUser.id,
+      buyerName: demoUser.label,
+    });
+  };
   const contractListingFromChat = async ({ listingId, chatId, partnerName, property }) => {
     const key = String(listingId || "");
     if (!key) return null;
@@ -647,8 +686,8 @@ export default function App() {
           {screen === "register" && <Register onDone={addProperty} onClose={() => setScreen(role === "owner" ? "mylist" : "home")} onBack={() => setScreen("home")}/>}
           {screen === "mylist" && <MyList properties={properties} preset={myListPreset} viewerKey={demoUser.id} brokerProposals={brokerProposals} directBuyerProposals={directBuyerProposals} onRegister={() => setScreen("register")} onSetDone={setDealDone} onExtendTerm={extendTerm} onUpdatePrice={updatePrice} onUpdateListing={updateListingInfo} onApproveProposal={saveProposalChatContext} role={role} availableRoles={availableRoles} onSwitchRole={switchRole}/>}
           {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} onRecordProposal={recordBrokerProposal} openModal={setModal}/>}
-          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat}/>}
-          {screen === "direct" && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat}/>}
+          {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat} onRecordProposal={recordDirectBuyerProposal}/>}
+          {screen === "direct" && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat} onRecordProposal={recordDirectBuyerProposal}/>}
           {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole} properties={properties} demoUsers={demoUsers}/>}
           {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} listingContracts={listingContracts} onContractListing={contractListingFromChat} onBack={() => setScreen("chatlist")} properties={properties} demoUsers={demoUsers}/>}

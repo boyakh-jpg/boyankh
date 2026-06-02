@@ -65,7 +65,7 @@ const chatFromContext = (context, role = "buyer") => {
     ? ownerLabelFromKey(ownerKey)
     : listing.ownerLabel || listing.ownerName;
   const expired = isDone(listing) || isTermExpired(listing);
-  const direct = context.mode === "직거래";
+  const direct = !!context.buyerKey || context.mode === "직거래";
   const ownerView = role === "owner";
   const partnerName = ownerView
     ? (direct ? context.buyerName || "직거래 매수자" : context.brokerName || "공인중개사")

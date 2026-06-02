@@ -54,7 +54,7 @@ function MultiFilter({ label, options, values, onToggle, tone = "gold", groups =
 
 const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.includes(v));
 
-export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [], preset = {}, menuMode = "all", onSwitchRole, availableRoles, viewerRole = "buyer", openModal, onOpenChat }) {
+export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [], preset = {}, menuMode = "all", onSwitchRole, availableRoles, viewerRole = "buyer", openModal, onOpenChat, onRecordProposal }) {
   const demoUser = getDemoUser();
   const pointDefault = getDefaultPointBalance(demoUser.role);
   const [hideViewed, setHideViewed] = useState(preset.hideViewed ?? true);
@@ -168,6 +168,13 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   );
   const proposalStatus = listing => proposalForListing(listing)?.activityType || null;
   const hasDirectProposal = listing => !!proposalForListing(listing);
+  useEffect(() => {
+    if (!onRecordProposal || demoUser.role !== "buyer") return;
+    properties.forEach(p => {
+      if (unlocked[p.id]) onRecordProposal({ listing: p, activityType: "열람" });
+      if (requests[p.id]) onRecordProposal({ listing: p, activityType: "안심의뢰" });
+    });
+  }, [properties, unlocked, requests]);
   const inListScope = p => {
     if (isViewedMenu) return (unlocked[p.id] || hasDirectProposal(p)) && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
     if (appliedFilters.listMode === "favorite") return favorites[p.id];
@@ -278,10 +285,10 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
       return;
     }
     if (p.fast) {
-      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_fast_contact"); updateStoredMap("buyerUnlocked", setUnlocked, u => ({ ...u, [p.id]: true })); showToast("10,000P 차감 · 연락처 확인 완료"); } });
+      openModal({ type: "pay", mode: "instant", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_fast_contact"); updateStoredMap("buyerUnlocked", setUnlocked, u => ({ ...u, [p.id]: true })); onRecordProposal?.({ listing: p, activityType: "열람" }); showToast("10,000P 차감 · 연락처 확인 완료"); } });
       return;
     }
-    openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_safe_request"); updateStoredMap("buyerRequests", setRequests, r => ({ ...r, [p.id]: "pending" })); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
+    openModal({ type: "pay", mode: "safe", cost: 10000, payload: p, onConfirm: () => { updatePoints(v => v - 10000, "buyer_safe_request"); updateStoredMap("buyerRequests", setRequests, r => ({ ...r, [p.id]: "pending" })); onRecordProposal?.({ listing: p, activityType: "안심의뢰" }); showToast("안심 열람 요청 전송 · 선차감 · 거절/무응답 환불"); } });
   };
   useEffect(() => {
     setListMode(menuMode);
