@@ -344,7 +344,7 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
   const mappedItems = items
     .map(item => ({ ...item, lat: Number(item.lat), lng: Number(item.lng) }))
     .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
-  const groupLevel = zoom <= 10 ? "region" : zoom <= 13 ? "dong" : "listing";
+  const groupLevel = zoom <= 11 ? "region" : zoom <= 15 ? "dong" : "listing";
   const coordCounts = {};
   const groups = groupLevel === "listing" ? mappedItems.map(item => {
     const coordKey = `${item.lat.toFixed(6)}:${item.lng.toFixed(6)}`;
@@ -422,7 +422,7 @@ export function MiniMap({ items = [], activeId, onPick, tone = "green" }) {
           map.setZoom(15);
         }
         if (isNewMap) maps.Event.addListener(map, "idle", () => {
-          if (alive) setZoom(map.getZoom());
+          if (mapRef.current === map) setZoom(map.getZoom());
         });
       })
       .catch(() => setReadyError("네이버 지도 인증을 확인하세요"));
