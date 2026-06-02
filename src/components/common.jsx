@@ -472,7 +472,8 @@ export function ListSheet({ kind, onlyNew = false, viewerKey = "toad-demo-owner"
   const decide = (item, key, value) => {
     if (!key) return;
     setLocalDecisions(d => {
-      const next = { ...(d && typeof d === "object" && !Array.isArray(d) ? d : {}), [key]: value };
+      const keys = [key, item?.requestId, item?.chatId, item?.id].filter(Boolean);
+      const next = { ...(d && typeof d === "object" && !Array.isArray(d) ? d : {}), ...Object.fromEntries(keys.map(k => [k, value])) };
       saveCache(CACHE_KEYS.contactDecisions, next);
       onProposalStateChange?.({ decisions: next });
       return next;

@@ -4,7 +4,7 @@ import { PROPERTIES, REGIONS, PROP_TYPES, DEAL_TYPES_BY_PROP, PROPERTY_TYPE_GROU
 import { applyStatusFilter, STATUS_FILTERS, isDone, isTermExpired, isExpiringSoon, daysLeft, termLabel, priceChangeRate, updateLabel } from "../utils/helpers";
 import { RoleToggle, SelectBox, MiniMap, DoneBadge, ContactBadge, NoteField, FeeEstimate, PriceTrend, PriceHistoryPanel, ListSheet, Frog, Tag } from "./common";
 import { getDemoUser } from "../data/demoUsers";
-import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
+import { CACHE_KEYS, getDefaultPointBalance, loadCache, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState, syncCache } from "../data/cache";
 
 
 function MultiFilter({ label, options, values, onToggle, tone = "gold", groups = null }) {
@@ -78,6 +78,10 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   const [favorites, setFavorites] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerFavorites"));
   const [unlocked, setUnlocked] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerUnlocked"));
   const [requests, setRequests] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerRequests"));
+  const [contactDecisions, setContactDecisions] = useState(() => {
+    const cached = loadCache(CACHE_KEYS.contactDecisions, {});
+    return cached && typeof cached === "object" && !Array.isArray(cached) ? cached : {};
+  });
   const [points, setPoints] = useState(() => loadLocalPointBalance(demoUser.id, pointDefault));
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notes, setNotes] = useState({});        // 매물별 메모
@@ -105,6 +109,13 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
     });
     return () => { alive = false; };
   }, [demoUser.id]);
+  useEffect(() => {
+    let alive = true;
+    syncCache(CACHE_KEYS.contactDecisions, {}).then(next => {
+      if (alive && next && typeof next === "object" && !Array.isArray(next)) setContactDecisions(next);
+    });
+    return () => { alive = false; };
+  }, []);
   const updatePoints = (updater, reason) => setPoints(prev => {
     const next = typeof updater === "function" ? updater(prev) : updater;
     savePointBalance({ userId: demoUser.id, balance: next, delta: next - prev, reason });
@@ -168,6 +179,18 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   );
   const proposalStatus = listing => proposalForListing(listing)?.activityType || null;
   const hasDirectProposal = listing => !!proposalForListing(listing);
+  const decisionForListing = listing => {
+    const proposal = proposalForListing(listing);
+    const listingId = listing?.demoListingId || listing?.demo_listing_id || listing?.id;
+    const keys = [
+      proposal?.requestId,
+      proposal?.chatId,
+      `direct-${listingId}-${demoUser.id}`,
+      `direct-${listing?.id}-${demoUser.id}`,
+    ].filter(Boolean).map(String);
+    return keys.map(key => contactDecisions[key]).find(Boolean) || null;
+  };
+  const hasBuyerActivity = listing => !!unlocked[listing.id] || !!requests[listing.id] || hasDirectProposal(listing) || !!decisionForListing(listing);
   useEffect(() => {
     if (!onRecordProposal || demoUser.role !== "buyer") return;
     properties.forEach(p => {
@@ -176,9 +199,9 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
     });
   }, [properties, unlocked, requests]);
   const inListScope = p => {
-    if (isViewedMenu) return (unlocked[p.id] || hasDirectProposal(p)) && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
+    if (isViewedMenu) return hasBuyerActivity(p) && (appliedFilters.listMode !== "favorite" || favorites[p.id]);
     if (appliedFilters.listMode === "favorite") return favorites[p.id];
-    return !appliedFilters.hideViewed || !(unlocked[p.id] || hasDirectProposal(p));
+    return !appliedFilters.hideViewed || !hasBuyerActivity(p);
   };
   const isListEligible = p => isDone(p) || p.status === "active";
   let list = properties.filter(p => isListEligible(p) && inListScope(p) && matchesAppliedRegion(p) && (appliedFilters.dong === "전체" || p.dong === appliedFilters.dong) && (!appliedFilters.ptypes.length || appliedFilters.ptypes.includes(p.propType)) && (!appliedFilters.dealTypes.length || appliedFilters.dealTypes.includes(p.dealType)) && (p.priceNum || 0) >= appliedFilters.priceMin && (p.priceNum || 0) <= appliedFilters.priceMax);
@@ -299,8 +322,9 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   }, [menuMode]);
 
   const DetailSheet = ({ listing }) => {
-    const open = unlocked[listing.id] || proposalStatus(listing) === "열람";
-    const requested = requests[listing.id] === "pending" || proposalStatus(listing) === "안심의뢰";
+    const contactDecision = decisionForListing(listing);
+    const open = unlocked[listing.id] || proposalStatus(listing) === "열람" || contactDecision === "approved";
+    const requested = !open && contactDecision !== "rejected" && (requests[listing.id] === "pending" || proposalStatus(listing) === "안심의뢰");
     const done = isDone(listing);
     const expired = isTermExpired(listing);
     const badge = leaseBadge(listing);
@@ -384,8 +408,9 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   };
 
   const Card = p => {
-    const open = unlocked[p.id] || proposalStatus(p) === "열람";
-    const requested = requests[p.id] === "pending" || proposalStatus(p) === "안심의뢰";
+    const contactDecision = decisionForListing(p);
+    const open = unlocked[p.id] || proposalStatus(p) === "열람" || contactDecision === "approved";
+    const requested = !open && contactDecision !== "rejected" && (requests[p.id] === "pending" || proposalStatus(p) === "안심의뢰");
     const hi = activePinIds?.has(p.id);
     const done = isDone(p);
     const expired = isTermExpired(p);

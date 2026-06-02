@@ -548,9 +548,10 @@ export default function App() {
   );
   const openDirectListingChat = listing => {
     const proposal = directProposalForListing(listing);
+    const listingId = listing.demoListingId || listing.demo_listing_id || listing.id;
     openChat({
       id: proposal?.chatId || `direct-${listing.id}-${demoUser.id}`,
-      contactRequestId: proposal?.requestId || proposal?.chatId || null,
+      contactRequestId: proposal?.requestId || `direct-${listingId}-${demoUser.id}`,
       listing: listingWithOwner(listing),
       mode: "직거래",
       activityType: proposal?.activityType || "직거래",
