@@ -57,7 +57,7 @@ const sameValues = (a = [], b = []) => a.length === b.length && a.every(v => b.i
 export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [], preset = {}, menuMode = "all", onSwitchRole, availableRoles, viewerRole = "buyer", openModal, onOpenChat }) {
   const demoUser = getDemoUser();
   const pointDefault = getDefaultPointBalance(demoUser.role);
-  const [hideViewed, setHideViewed] = useState(true);
+  const [hideViewed, setHideViewed] = useState(preset.hideViewed ?? true);
   const maxListPrice = Math.ceil(Math.max(...properties.map(p => p.priceNum || 0), 100000) / 10000) * 10000;
   const [sido, setSido] = useState("서울특별시");
   const [regionGroup, setRegionGroup] = useState([]);
@@ -74,7 +74,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   const [selected, setSelected] = useState(null);
   const [listMode, setListMode] = useState(menuMode);
   const [filterOpen, setFilterOpen] = useState(menuMode !== "viewed");
-  const [appliedFilters, setAppliedFilters] = useState({ regionGroup, region, dong, ptypes, dealTypes, priceMin, priceMax, sort, statusFilter, hideViewed, listMode });
+  const [appliedFilters, setAppliedFilters] = useState({ regionGroup, region, dong, ptypes, dealTypes, priceMin, priceMax, sort, statusFilter, hideViewed, listMode, trendFilter: preset.trendFilter || "all" });
   const [favorites, setFavorites] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerFavorites"));
   const [unlocked, setUnlocked] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerUnlocked"));
   const [requests, setRequests] = useState(() => loadUserMapStateLocal(demoUser.id, "buyerRequests"));
@@ -176,6 +176,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   const isListEligible = p => isDone(p) || p.status === "active";
   let list = properties.filter(p => isListEligible(p) && inListScope(p) && matchesAppliedRegion(p) && (appliedFilters.dong === "전체" || p.dong === appliedFilters.dong) && (!appliedFilters.ptypes.length || appliedFilters.ptypes.includes(p.propType)) && (!appliedFilters.dealTypes.length || appliedFilters.dealTypes.includes(p.dealType)) && (p.priceNum || 0) >= appliedFilters.priceMin && (p.priceNum || 0) <= appliedFilters.priceMax);
   list = applyStatusFilter(list, appliedFilters.statusFilter);
+  if (appliedFilters.trendFilter === "down") list = list.filter(p => priceChangeRate(p) < -0.1);
   if (appliedFilters.sort === "낮은가격순") list = [...list].sort((a, b) => a.priceNum - b.priceNum);
   else if (appliedFilters.sort === "높은가격순") list = [...list].sort((a, b) => b.priceNum - a.priceNum);
   else if (appliedFilters.sort === "인기순") list = [...list].sort((a, b) => b.views - a.views);
@@ -183,13 +184,14 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
   else if (appliedFilters.sort === "추이 하락순") list = [...list].sort((a, b) => priceChangeRate(a) - priceChangeRate(b));
   let mapList = properties.filter(p => isListEligible(p) && inListScope(p) && (!appliedFilters.ptypes.length || appliedFilters.ptypes.includes(p.propType)) && (!appliedFilters.dealTypes.length || appliedFilters.dealTypes.includes(p.dealType)) && (p.priceNum || 0) >= appliedFilters.priceMin && (p.priceNum || 0) <= appliedFilters.priceMax);
   mapList = applyStatusFilter(mapList, appliedFilters.statusFilter);
+  if (appliedFilters.trendFilter === "down") mapList = mapList.filter(p => priceChangeRate(p) < -0.1);
   const activePin = activeMapGroup && activeMapGroup.ids?.some(id => list.some(p => p.id === id)) ? activeMapGroup : null;
   const activePinIds = activePin ? new Set(activePin.ids) : null;
   const visibleList = activePinIds ? list.filter(p => activePinIds.has(p.id)).slice(0, 20) : list;
-  const hasFilter = appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.priceMin > 0 || appliedFilters.priceMax < maxListPrice || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
+  const hasFilter = appliedFilters.region !== "전체" || appliedFilters.dong !== "전체" || appliedFilters.ptypes.length > 0 || appliedFilters.dealTypes.length > 0 || appliedFilters.priceMin > 0 || appliedFilters.priceMax < maxListPrice || appliedFilters.sort !== "최신순" || appliedFilters.statusFilter !== "거래중만 보기" || appliedFilters.trendFilter !== "all" || !appliedFilters.hideViewed || appliedFilters.listMode !== menuMode;
   const hasPendingFilters = appliedFilters.region !== region || appliedFilters.dong !== dong || appliedFilters.priceMin !== priceMin || appliedFilters.priceMax !== priceMax || appliedFilters.sort !== sort || appliedFilters.statusFilter !== statusFilter || appliedFilters.hideViewed !== hideViewed || appliedFilters.listMode !== listMode || !sameValues(appliedFilters.ptypes, ptypes) || !sameValues(appliedFilters.dealTypes, dealTypes);
   const applyFilters = () => {
-    setAppliedFilters({ regionGroup: [...regionGroup], region, dong, ptypes: [...ptypes], dealTypes: [...dealTypes], priceMin, priceMax, sort, statusFilter, hideViewed, listMode });
+    setAppliedFilters({ regionGroup: [...regionGroup], region, dong, ptypes: [...ptypes], dealTypes: [...dealTypes], priceMin, priceMax, sort, statusFilter, hideViewed, listMode, trendFilter: "all" });
     setActiveId(null);
     setActiveMapGroup(null);
   };
@@ -219,7 +221,7 @@ export function BuyerExplore({ properties = PROPERTIES, directBuyerProposals = [
     setActiveId(null);
   };
   const resetFilters = () => {
-    const nextFilters = { regionGroup: [], region: "전체", dong: "전체", ptypes: [], dealTypes: [], priceMin: 0, priceMax: maxListPrice, sort: "최신순", statusFilter: "거래중만 보기", hideViewed: true, listMode: menuMode };
+    const nextFilters = { regionGroup: [], region: "전체", dong: "전체", ptypes: [], dealTypes: [], priceMin: 0, priceMax: maxListPrice, sort: "최신순", statusFilter: "거래중만 보기", hideViewed: true, listMode: menuMode, trendFilter: "all" };
     setRegion("전체");
     setRegionGroup([]);
     setDong("전체");

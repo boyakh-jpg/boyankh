@@ -63,7 +63,7 @@ export function Broker({ properties = PROPERTIES, brokerProposals = [], preset =
   const [defaultMsg, setDefaultMsg] = useState("안녕하세요! 해당 매물 빠른 거래 도와드리겠습니다.");
   const [toast, setToast] = useState("");
   const [chargeOpen, setChargeOpen] = useState(false);
-  const [hideViewed, setHideViewed] = useState(true);
+  const [hideViewed, setHideViewed] = useState(preset.hideViewed ?? true);
   const [sido, setSido] = useState("서울특별시");
   const [regionGroup, setRegionGroup] = useState([]);
   const [region, setRegion] = useState(preset.region || "전체");

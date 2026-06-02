@@ -182,15 +182,14 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
     return tierPoint * 1000 + (100 - (office.percentileInRegion || 100)) + regionBoost;
   };
   const activeListings = properties.filter(p => !isDone(p));
-  const localListings = activeListings.filter(p => targetRegions.includes(p.region));
-  const recommendedListings = localListings.length ? localListings : activeListings;
   const localPreset = preferredRegion ? { region: preferredRegion } : {};
+  const homeListPreset = { ...localPreset, hideViewed: false };
   const baseLabel = preferredRegion || "전체 지역";
   const baseListings = preferredRegion ? activeListings.filter(p => p.region === preferredRegion) : activeListings;
   const interestListings = interestRegion ? activeListings.filter(p => p.region === interestRegion) : [];
-  const newCount = recommendedListings.filter(isNewListing).length;
-  const expiringCount = recommendedListings.filter(isExpiringSoon).length;
-  const priceDownCount = recommendedListings.filter(p => priceChangeRate(p) < -0.1).length;
+  const baseNewCount = baseListings.filter(isNewListing).length;
+  const baseExpiringCount = baseListings.filter(isExpiringSoon).length;
+  const basePriceDownCount = baseListings.filter(p => priceChangeRate(p) < -0.1).length;
   const brokerBonus = { 무료: 0, 실버: 5, 골드: 10 }[brokerTier] || 0;
   const ownerListings = properties.filter(p => p.mine);
   const ownerProposalItemsFor = (items, kind) => {
@@ -238,15 +237,15 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
         <Header role={role} availableRoles={availableRoles} title="공인중개사 홈" subtitle="중개 매물이 있어요" mood="smug" onSwitchRole={onSwitchRole} actionLabel="매물 보기" onAction={() => onBrokerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <StatCard value={baseListings.length + "건"} label="기본지역 매물" tone="green" onClick={() => onBrokerList({ region: preferredRegion })}/>
-            <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="green" onClick={() => onBrokerList({ region: interestRegion })}/>
-            <StatCard value={newCount + "건"} label="3일 신규매물" tone="gold" onClick={() => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
+            <StatCard value={baseListings.length + "건"} label="기본지역 매물" tone="green" onClick={() => onBrokerList({ region: preferredRegion, hideViewed: false })}/>
+            <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="green" onClick={() => onBrokerList({ region: interestRegion, hideViewed: false })}/>
+            <StatCard value={baseNewCount + "건"} label="3일 신규매물" tone="gold" onClick={() => onBrokerList({ ...homeListPreset, statusFilter: "3일 이내 신규" })}/>
           </div>
           <BrokerPlanIntro tier={brokerTier} bonus={brokerBonus} onClick={onSubscription}/>
           <TaskList cacheKey={todayTaskKey} items={[
-            ["수수료 높은 매물", `${baseLabel} 예상 중개보수 상위 ${baseListings.length}건`, () => onBrokerList({ ...localPreset, sort: "수수료높은순" })],
-            ["신규 의뢰", `${baseLabel} 최근 3일 신규 ${newCount}건`, () => onBrokerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
-            ["만료 임박", `${baseLabel} ${expiringCount}건은 빠르게 제안해야 해요`, () => onBrokerList({ ...localPreset, statusFilter: "만료 임박" })],
+            ["수수료 높은 매물", `${baseLabel} 예상 중개보수 상위 ${baseListings.length}건`, () => onBrokerList({ ...homeListPreset, sort: "수수료높은순" })],
+            ["신규 의뢰", `${baseLabel} 최근 3일 신규 ${baseNewCount}건`, () => onBrokerList({ ...homeListPreset, statusFilter: "3일 이내 신규" })],
+            ["만료 임박", `${baseLabel} ${baseExpiringCount}건은 빠르게 제안해야 해요`, () => onBrokerList({ ...homeListPreset, statusFilter: "만료 임박" })],
           ]}/>
           <SectionTitle title="기본지역 추천 매물" actionLabel="기본지역 매물로 이동" onAction={() => onBrokerList({ region: preferredRegion })}/>
           {brokerBaseSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => setDetail({ listing: l, tone: l.fast ? "gold" : "green" })} showFee/>)}
@@ -267,14 +266,14 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
         <Header role={role} availableRoles={availableRoles} title="직거래 홈" subtitle="쉽게 집을 찾아요" mood="cool" onSwitchRole={onSwitchRole} actionLabel="직거래 매물 보기" onAction={() => onBuyerList(localPreset)}/>
         <div style={{ padding: "18px 16px 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-            <StatCard value={baseListings.length + "건"} label="기본지역 매물" tone="gold" onClick={() => onBuyerList({ region: preferredRegion })}/>
-            <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="gold" onClick={() => onBuyerList({ region: interestRegion })}/>
-            <StatCard value={newCount + "건"} label="3일 신규매물" tone="green" onClick={() => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })}/>
+            <StatCard value={baseListings.length + "건"} label="기본지역 매물" tone="gold" onClick={() => onBuyerList({ region: preferredRegion, hideViewed: false })}/>
+            <StatCard value={interestListings.length + "건"} label="관심지역 매물" tone="gold" onClick={() => onBuyerList({ region: interestRegion, hideViewed: false })}/>
+            <StatCard value={baseNewCount + "건"} label="3일 신규매물" tone="green" onClick={() => onBuyerList({ ...homeListPreset, statusFilter: "3일 이내 신규" })}/>
           </div>
           <TaskList cacheKey={todayTaskKey} items={[
-            ["신규 매물", `${baseLabel} 최근 3일 신규 ${newCount}건`, () => onBuyerList({ ...localPreset, statusFilter: "3일 이내 신규" })],
-            ["가격 인하 매물", `${baseLabel} ${priceDownCount}건은 가격이 내려갔어요`, () => onBuyerList({ ...localPreset, sort: "추이 하락순" })],
-            ["인기 매물", `${baseLabel} 열람 많은 매물 ${recommendedListings.length}건`, () => onBuyerList({ ...localPreset, sort: "인기순" })],
+            ["신규 매물", `${baseLabel} 최근 3일 신규 ${baseNewCount}건`, () => onBuyerList({ ...homeListPreset, statusFilter: "3일 이내 신규" })],
+            ["가격 인하 매물", `${baseLabel} ${basePriceDownCount}건은 가격이 내려갔어요`, () => onBuyerList({ ...homeListPreset, sort: "추이 하락순", trendFilter: "down" })],
+            ["인기 매물", `${baseLabel} 열람 많은 매물 ${baseListings.length}건`, () => onBuyerList({ ...homeListPreset, sort: "인기순" })],
           ]}/>
           <SectionTitle title="기본지역 추천 매물" actionLabel="기본지역 매물로 이동" actionColor={C.goldInk} onAction={() => onBuyerList({ region: preferredRegion })}/>
           {buyerBaseSummary.map(l => <ListingCard key={l.id} listing={l} tone="gold" onClick={() => setDetail({ listing: l, tone: "gold" })}/>)}
@@ -295,14 +294,14 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
       <Header role={role} availableRoles={availableRoles} title="소유주 홈" subtitle="빠르게 집을 내놓아요" mood="calm" onSwitchRole={onSwitchRole} actionLabel="매물 의뢰하기" onAction={onRegister}/>
       <div style={{ padding: "18px 16px 0" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
-          <StatCard value={ownerActiveCount + "건"} label="진행 의뢰" tone="green" onClick={() => onMyList()}/>
+          <StatCard value={ownerActiveCount + "건"} label="진행 의뢰" tone="green" onClick={() => onMyList({ statusFilter: "거래중" })}/>
           <StatCard value={ownerProposalCounts.brokers + "곳"} label="의뢰받은 부동산" tone="green" onClick={() => setSheet("broker")}/>
           <StatCard value={ownerProposalCounts.direct + "명"} label="직거래 매수자" tone="gold" onClick={() => setSheet("direct")}/>
         </div>
         <TaskList cacheKey={todayTaskKey} items={[
           ["새롭게 제안한 부동산", `아직 확인하지 않은 제안 ${ownerProposalCounts.newBrokers}곳`, () => setSheet({ kind: "broker", mode: "new" })],
           ["새롭게 제안한 직거래 매수자", `아직 확인하지 않은 매수자 ${ownerProposalCounts.newDirect}명`, () => setSheet({ kind: "direct", mode: "new" })],
-          ["내 매물 확인", `${ownerActiveCount}건 진행 중이에요`, () => onMyList()],
+          ["내 매물 확인", `${ownerActiveCount}건 진행 중이에요`, () => onMyList({ statusFilter: "거래중" })],
           ["만료 임박", `${ownerExpiringCount}건은 의뢰 기간 확인이 필요해요`, () => onMyList({ statusFilter: "만료 임박" })],
         ]}/>
         <SectionTitle title="기본지역 추천 부동산" actionLabel="기본지역 부동산으로 이동" onAction={onOffices}/>
@@ -311,8 +310,8 @@ export function Home({ onRegister, onMyList, onOffices, onBrokerList, onBuyerLis
           <SectionTitle title="관심지역 추천 부동산" actionLabel="관심지역 부동산으로 이동" onAction={onOffices}/>
           {interestOffices.map((b, i) => <BrokerOfficeCard key={i} broker={b} actionLabel="상세 보기" onClick={() => setOfficeDetail(b)}/>)}
         </>}
-        <SectionTitle title="내 매물" actionLabel="내 매물로 이동" onAction={() => onMyList()}/>
-        {ownerSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => onMyList()}/>)}
+        <SectionTitle title="내 매물" actionLabel="내 매물로 이동" onAction={() => onMyList({ statusFilter: "거래중" })}/>
+        {ownerSummary.map(l => <ListingCard key={l.id} listing={l} tone={l.fast ? "gold" : "green"} onClick={() => onMyList({ statusFilter: "거래중" })}/>)}
         <div style={{ height: 64 }}/>
       </div>
     </div>
