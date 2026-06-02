@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { C, G, SH1, SH2 } from "../theme";
-import { REGIONS } from "../data/data";
+import { PROPERTY_TYPE_OPTIONS, REGIONS } from "../data/data";
 import { DEMO_USERS, getDemoUser, saveDemoUser } from "../data/demoUsers";
 import { getDefaultPointBalance, loadLocalPointBalance, loadPointBalance, loadUserMapState, loadUserMapStateLocal, savePointBalance, saveUserMapState } from "../data/cache";
 import { Frog, RoleToggle, SelectBox, Tag } from "./common";
@@ -12,6 +12,66 @@ const NOTIFICATION_LABELS = [
   ["chat", "채팅/문의", "새 채팅과 문의 알림"],
   ["points", "포인트 부족", "열람 전 포인트 부족 알림"],
 ];
+
+const POSTCODE_SCRIPT_URL = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+const getPostcode = () => window.daum?.Postcode || window.kakao?.Postcode;
+const SIDO_LABELS = {
+  서울: "서울특별시",
+  부산: "부산광역시",
+  대구: "대구광역시",
+  인천: "인천광역시",
+  광주: "광주광역시",
+  대전: "대전광역시",
+  울산: "울산광역시",
+  세종: "세종특별자치시",
+  경기: "경기도",
+  강원: "강원특별자치도",
+  충북: "충청북도",
+  충남: "충청남도",
+  전북: "전북특별자치도",
+  전남: "전라남도",
+  경북: "경상북도",
+  경남: "경상남도",
+  제주: "제주특별자치도",
+};
+const loadPostcodeScript = () => new Promise((resolve, reject) => {
+  if (typeof window === "undefined") return reject(new Error("window unavailable"));
+  if (getPostcode()) return resolve(getPostcode());
+  const current = document.querySelector(`script[src="${POSTCODE_SCRIPT_URL}"]`);
+  if (current) {
+    current.addEventListener("load", () => resolve(getPostcode()), { once: true });
+    current.addEventListener("error", reject, { once: true });
+    return;
+  }
+  const script = document.createElement("script");
+  script.src = POSTCODE_SCRIPT_URL;
+  script.async = true;
+  script.onload = () => resolve(getPostcode());
+  script.onerror = reject;
+  document.head.appendChild(script);
+});
+const normalizeSido = value => SIDO_LABELS[value] || value || "";
+const pickCity = data => normalizeSido(data.sido || (data.address || data.roadAddress || data.jibunAddress || "").split(" ")[0] || "");
+const pickRegion = data => data.sigungu || (data.address || data.roadAddress || data.jibunAddress || "").match(/(\S+(구|시|군))/)?.[1] || "";
+const pickDong = data => data.bname || (data.jibunAddress || data.address || "").match(/(\S+(동|읍|면|가))/)?.[1] || "";
+const fullAddress = (base, detail) => [base, detail].filter(Boolean).join(" ");
+const expandSidoInAddress = (address, city) => {
+  if (!address || !city) return address || "";
+  const shortCity = Object.keys(SIDO_LABELS).find(key => SIDO_LABELS[key] === city);
+  return shortCity && address.startsWith(`${shortCity} `) ? address.replace(shortCity, city) : address;
+};
+const geocodeAddressOnce = async address => {
+  const endpoint = import.meta.env.VITE_NAVER_GEOCODE_ENDPOINT;
+  if (!endpoint || !address) return null;
+  const url = `${endpoint}${endpoint.includes("?") ? "&" : "?"}query=${encodeURIComponent(address)}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const first = data.addresses?.[0] || data.results?.[0];
+  const lat = Number(first?.y ?? first?.point?.y ?? first?.lat);
+  const lng = Number(first?.x ?? first?.point?.x ?? first?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+};
 
 function Section({ title, children }) {
   return (
@@ -289,11 +349,156 @@ function AccountSubPage({ page, role, brokerTier, demoUser, onBack }) {
   return null;
 }
 
-function BrokerSubPage({ page, brokerTier, onSubscription, onBack }) {
+function BrokerOfficeForm({ brokerOffice, demoUser, onRegisterBrokerOffice, onBack }) {
+  const pageTopRef = useRef(null);
+  const [draft, setDraft] = useState(() => ({
+    brokerUserId: demoUser.id,
+    officeName: brokerOffice?.officeName || "",
+    agentName: brokerOffice?.agentName || demoUser.name || "",
+    licenseNo: brokerOffice?.licenseNo || "",
+    phone: brokerOffice?.phone || demoUser.phone || "",
+    address: brokerOffice?.address || "",
+    detailAddress: "",
+    city: brokerOffice?.city || "",
+    region: brokerOffice?.region || "",
+    dong: brokerOffice?.dong || "",
+    lat: brokerOffice?.lat || null,
+    lng: brokerOffice?.lng || null,
+    businessHours: brokerOffice?.businessHours || "평일 09:00-18:00",
+    proposalMessage: brokerOffice?.proposalMessage || "",
+    specialtyTypes: brokerOffice?.specialtyTypes?.length ? brokerOffice.specialtyTypes : ["아파트"],
+  }));
+  const [notice, setNotice] = useState("");
+  const [addressError, setAddressError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const setField = (key, value) => setDraft(prev => ({ ...prev, [key]: value }));
+  const toggleType = type => setDraft(prev => {
+    const hasType = prev.specialtyTypes.includes(type);
+    const nextTypes = hasType ? prev.specialtyTypes.filter(item => item !== type) : [...prev.specialtyTypes, type];
+    return { ...prev, specialtyTypes: nextTypes.length ? nextTypes : [type] };
+  });
+
+  useEffect(() => {
+    pageTopRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    loadPostcodeScript().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setDraft({
+      brokerUserId: demoUser.id,
+      officeName: brokerOffice?.officeName || "",
+      agentName: brokerOffice?.agentName || demoUser.name || "",
+      licenseNo: brokerOffice?.licenseNo || "",
+      phone: brokerOffice?.phone || demoUser.phone || "",
+      address: brokerOffice?.address || "",
+      detailAddress: "",
+      city: brokerOffice?.city || "",
+      region: brokerOffice?.region || "",
+      dong: brokerOffice?.dong || "",
+      lat: brokerOffice?.lat || null,
+      lng: brokerOffice?.lng || null,
+      businessHours: brokerOffice?.businessHours || "평일 09:00-18:00",
+      proposalMessage: brokerOffice?.proposalMessage || "",
+      specialtyTypes: brokerOffice?.specialtyTypes?.length ? brokerOffice.specialtyTypes : ["아파트"],
+    });
+  }, [brokerOffice?.id, demoUser.id, demoUser.name, demoUser.phone]);
+
+  const openAddressSearch = async () => {
+    setAddressError("");
+    try {
+      const Postcode = await loadPostcodeScript();
+      new Postcode({
+        oncomplete: data => {
+          const city = pickCity(data);
+          const baseAddress = expandSidoInAddress(data.roadAddress || data.jibunAddress || data.address || "", city);
+          setDraft(prev => ({
+            ...prev,
+            address: baseAddress,
+            detailAddress: "",
+            city,
+            region: pickRegion(data),
+            dong: pickDong(data),
+            lat: null,
+            lng: null,
+          }));
+          geocodeAddressOnce(baseAddress).then(coords => {
+            if (coords) setDraft(prev => prev.address === baseAddress ? { ...prev, ...coords } : prev);
+          });
+        },
+      }).open({ q: draft.address || undefined, popupTitle: "부동산 주소 찾기" });
+    } catch {
+      setAddressError("주소검색을 불러오지 못했어요. Vercel 도메인/키 설정을 확인해 주세요.");
+    }
+  };
+
+  const submit = async () => {
+    setNotice("");
+    if (!draft.officeName || !draft.agentName || !draft.licenseNo || !draft.phone || !draft.address) {
+      setNotice("상호, 중개사명, 등록번호, 연락처, 주소를 입력해 주세요.");
+      return;
+    }
+    setSaving(true);
+    const saved = await onRegisterBrokerOffice?.({ ...draft, address: fullAddress(draft.address, draft.detailAddress) });
+    setSaving(false);
+    setNotice(saved ? "부동산 정보 저장 완료" : "부동산 정보 저장 실패");
+  };
+
+  return (
+    <div ref={pageTopRef} style={{ padding: 16 }}>
+      <BackButton label="중개사 설정" onClick={onBack}/>
+      {notice && <div style={{ background: G.greenSoft, color: C.greenInk, borderRadius: 14, padding: "10px 12px", fontSize: 12, fontWeight: 900, marginBottom: 10 }}>{notice}</div>}
+      <Section title="부동산 등록">
+        <TextInput label="상호" value={draft.officeName} onChange={value => setField("officeName", value)} placeholder="예: 역삼토드공인중개사사무소"/>
+        <TextInput label="대표/중개사" value={draft.agentName} onChange={value => setField("agentName", value)} placeholder="예: 김토드 공인중개사"/>
+        <TextInput label="등록번호" value={draft.licenseNo} onChange={value => setField("licenseNo", value)} placeholder="예: 11680-2026-00001"/>
+        <TextInput label="연락처" value={draft.phone} onChange={value => setField("phone", value)} placeholder="02-0000-0000"/>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: "block", fontSize: 11, color: C.gray, fontWeight: 800, marginBottom: 5 }}>사무소 주소</div>
+          <button onClick={openAddressSearch} style={{ width: "100%", minHeight: 44, boxSizing: "border-box", padding: "12px 11px", borderRadius: 13, border: `1.5px solid ${C.line}`, background: "#fff", color: draft.address ? C.dark : C.gray, fontSize: 13, fontWeight: 800, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
+            {draft.address || "주소 찾기로 선택"}
+          </button>
+          {addressError && <div style={{ fontSize: 11, color: C.goldInk, fontWeight: 800, marginTop: 6 }}>{addressError}</div>}
+        </div>
+        <TextInput label="상세주소" value={draft.detailAddress} onChange={value => setField("detailAddress", value)} placeholder="층, 호수"/>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <div style={{ background: G.greenSoft, borderRadius: 13, padding: "10px 11px" }}>
+            <div style={{ fontSize: 11, color: C.gray, fontWeight: 800 }}>자동 분류</div>
+            <div style={{ fontSize: 13, color: C.greenInk, fontWeight: 900, marginTop: 2 }}>{[draft.city, draft.region, draft.dong].filter(Boolean).join(" ") || "주소 선택 필요"}</div>
+          </div>
+          <div style={{ background: G.goldSoft, borderRadius: 13, padding: "10px 11px" }}>
+            <div style={{ fontSize: 11, color: C.gray, fontWeight: 800 }}>좌표</div>
+            <div style={{ fontSize: 13, color: C.goldInk, fontWeight: 900, marginTop: 2 }}>{draft.lat && draft.lng ? "저장 가능" : "주소 저장 후 보강"}</div>
+          </div>
+        </div>
+        <TextInput label="영업시간" value={draft.businessHours} onChange={value => setField("businessHours", value)} placeholder="평일 09:00-18:00"/>
+        <TextArea label="소유주에게 보일 소개문" value={draft.proposalMessage} onChange={value => setField("proposalMessage", value)} placeholder="전문 지역, 강점, 응답 방식을 적어 주세요."/>
+      </Section>
+      <Section title="전문 매물 유형">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {PROPERTY_TYPE_OPTIONS.map(option => {
+            const active = draft.specialtyTypes.includes(option.value);
+            return (
+              <button key={option.value} onClick={() => toggleType(option.value)} style={{ border: `1.5px solid ${active ? C.green : C.line}`, background: active ? G.greenSoft : "#fff", color: active ? C.greenInk : C.mid, borderRadius: 14, padding: "8px 10px", fontSize: 12, fontWeight: 900, fontFamily: "inherit", cursor: "pointer" }}>
+                {option.value}
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+      <button onClick={submit} disabled={saving} style={{ width: "100%", border: "none", background: saving ? "#D5DDD7" : G.header, color: "#fff", borderRadius: 16, padding: "14px 0", fontSize: 15, fontWeight: 900, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: saving ? "none" : SH2 }}>{saving ? "저장 중" : "부동산 정보 저장"}</button>
+    </div>
+  );
+}
+
+function BrokerSubPage({ page, brokerTier, demoUser, brokerOffice, onRegisterBrokerOffice, onSubscription, onBack }) {
   const pageTopRef = useRef(null);
   useEffect(() => {
     pageTopRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
   }, [page]);
+
+  if (page === "office") {
+    return <BrokerOfficeForm brokerOffice={brokerOffice} demoUser={demoUser} onRegisterBrokerOffice={onRegisterBrokerOffice} onBack={onBack}/>;
+  }
 
   const data = {
     office: { title: "부동산 정보", sub: "상호, 등록번호, 사무소 주소", rows: [["상호", "토드공인중개사사무소"], ["대표/중개사", "김토드 공인중개사"], ["등록번호", "11680-2026-00001"], ["사무소 주소", "서울특별시 강남구 대치동"], ["연락처", "02-1234-5678"]] },
@@ -320,13 +525,14 @@ function BrokerSubPage({ page, brokerTier, onSubscription, onBack }) {
   );
 }
 
-export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", demoUsers = DEMO_USERS, onSubscription, onDemoUserChange, onBack }) {
+export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, interestRegion, onRegionChange, onInterestRegionChange, notifications, onToggleNotification, brokerTier = "골드", demoUsers = DEMO_USERS, brokerOffices = [], onRegisterBrokerOffice, onSubscription, onDemoUserChange, onBack }) {
   const [accountPage, setAccountPage] = useState(null);
   const [brokerPage, setBrokerPage] = useState(null);
   const [demoUserId, setDemoUserId] = useState(() => getDemoUser().id);
   const topRef = useRef(null);
   const regionOptions = REGIONS.filter(r => r !== "전체");
   const selectedDemoUser = demoUsers.find(user => user.id === demoUserId) || getDemoUser(demoUsers);
+  const selectedBrokerOffice = brokerOffices.find(office => office.brokerUserId === selectedDemoUser.id);
   const ownerDemoUsers = demoUsers.filter(user => user.role === "owner");
   const brokerDemoUsers = demoUsers.filter(user => user.role === "broker");
   const buyerDemoUsers = demoUsers.filter(user => user.role === "buyer");
@@ -359,7 +565,7 @@ export function Settings({ role, availableRoles, onSwitchRole, preferredRegion, 
           </div>
         </div>
       </div>
-      {accountPage ? <AccountSubPage page={accountPage} role={role} brokerTier={brokerTier} demoUser={selectedDemoUser} onBack={() => setAccountPage(null)}/> : brokerPage ? <BrokerSubPage page={brokerPage} brokerTier={brokerTier} onSubscription={onSubscription} onBack={() => setBrokerPage(null)}/> : <div style={{ padding: 16 }}>
+      {accountPage ? <AccountSubPage page={accountPage} role={role} brokerTier={brokerTier} demoUser={selectedDemoUser} onBack={() => setAccountPage(null)}/> : brokerPage ? <BrokerSubPage page={brokerPage} brokerTier={brokerTier} demoUser={selectedDemoUser} brokerOffice={selectedBrokerOffice} onRegisterBrokerOffice={onRegisterBrokerOffice} onSubscription={onSubscription} onBack={() => setBrokerPage(null)}/> : <div style={{ padding: 16 }}>
         <BackButton label="뒤로가기" onClick={onBack}/>
         <Section title="테스트 아이디">
           <div style={{ background: G.greenSoft, borderRadius: 14, padding: "12px 13px", marginBottom: 10 }}>

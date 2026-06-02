@@ -338,6 +338,63 @@ export default function App() {
 
     setProperties(prev => [{ ...normalizeListing(data, ownerKey), mine: true, ownerKey, ownerLabel: demoUser.label }, ...prev]);
   };
+  const normalizeBrokerOfficeRow = row => ({
+    id: row.id,
+    brokerUserId: row.broker_user_id || row.brokerUserId,
+    officeName: row.office_name || row.officeName,
+    agentName: row.agent_name || row.agentName,
+    licenseNo: row.license_no || row.licenseNo,
+    address: row.address,
+    phone: row.phone,
+    city: row.city || "",
+    region: row.region || "전체",
+    dong: row.dong || "",
+    lat: row.lat,
+    lng: row.lng,
+    specialtyRegions: row.specialty_regions || row.specialtyRegions || [],
+    specialtyTypes: (row.specialty_types || row.specialtyTypes || []).map(normalizePropType),
+    verifiedDeals12m: row.verified_deals_12m || row.verifiedDeals12m || 0,
+    percentileInRegion: row.percentile_in_region || row.percentileInRegion || 99,
+    tier: row.tier || "검증 부동산",
+    reviewCount: row.review_count || row.reviewCount || 0,
+    responseMode: row.response_mode || row.responseMode || "chat",
+    businessHours: row.business_hours || row.businessHours || "평일 09:00-18:00",
+    lastActive: row.last_active || row.lastActive || "방금 등록",
+    proposalMessage: row.proposal_message || row.proposalMessage || "",
+    reviews: row.reviews || [],
+  });
+  const registerBrokerOffice = async draft => {
+    const brokerKey = demoUser.role === "broker" ? demoUser.id : draft.brokerUserId;
+    if (!brokerKey) return null;
+    const officeArg = {
+      office_name: draft.officeName,
+      agent_name: draft.agentName,
+      license_no: draft.licenseNo,
+      address: draft.address,
+      phone: draft.phone,
+      city: draft.city,
+      region: draft.region,
+      dong: draft.dong,
+      lat: draft.lat,
+      lng: draft.lng,
+      specialty_regions: draft.region ? [draft.region] : [],
+      specialty_types: draft.specialtyTypes || [],
+      business_hours: draft.businessHours,
+      proposal_message: draft.proposalMessage,
+    };
+    const { data, error } = await supabase.rpc("create_demo_broker_office", {
+      broker_user_id_arg: brokerKey,
+      office_arg: officeArg,
+    });
+    if (error) {
+      console.error("Supabase broker office save error:", error);
+      if (typeof window !== "undefined") window.alert("부동산 등록에 실패했어요. SQL migration 실행 여부를 확인해 주세요.");
+      return null;
+    }
+    const nextOffice = normalizeBrokerOfficeRow(data);
+    setBrokerOffices(prev => [nextOffice, ...prev.filter(office => office.id !== nextOffice.id && office.brokerUserId !== brokerKey)]);
+    return nextOffice;
+  };
   // 거래 완료/되돌리기 토글
   const setDealDone = async (id, done) => {
     if (!(await requireAuthUser("update listing status"))) return;
@@ -698,7 +755,7 @@ export default function App() {
           {["broker", "brokerViewed"].includes(screen) && <Broker properties={properties} brokerProposals={brokerProposals} preset={brokerPreset} menuMode={screen === "brokerViewed" ? "viewed" : "all"} role={role} availableRoles={availableRoles} tier={brokerTier} onSwitchRole={switchRole} onOpenChat={openBrokerListingChat} onRecordProposal={recordBrokerProposal} openModal={setModal}/>}
           {["buyer", "buyerViewed"].includes(screen) && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} preset={buyerPreset} menuMode={screen === "buyerViewed" ? "viewed" : "all"} onSwitchRole={switchRole} availableRoles={availableRoles} viewerRole="buyer" openModal={setModal} onOpenChat={openDirectListingChat} onRecordProposal={recordDirectBuyerProposal}/>}
           {screen === "direct" && <BuyerExplore properties={properties} directBuyerProposals={directBuyerProposals} viewerRole={role === "broker" ? "broker" : "owner"} availableRoles={availableRoles} onSwitchRole={switchRole} openModal={setModal} onOpenChat={openDirectListingChat} onRecordProposal={recordDirectBuyerProposal}/>}
-          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onBack={() => setScreen(settingsBack)}/>}
+          {screen === "settings" && <Settings role={role} availableRoles={availableRoles} onSwitchRole={switchRole} preferredRegion={preferredRegion} interestRegion={interestRegion} onRegionChange={setPreferredRegion} onInterestRegionChange={setInterestRegion} notifications={notifications} onToggleNotification={toggleNotification} brokerTier={brokerTier} demoUsers={demoUsers} brokerOffices={brokerOffices} onRegisterBrokerOffice={registerBrokerOffice} onSubscription={() => setScreen("profile")} onDemoUserChange={applyDemoUser} onBack={() => setScreen(settingsBack)}/>}
           {screen === "chatlist" && <ChatList onOpen={openChat} role={role} availableRoles={availableRoles} onSwitchRole={switchRole} properties={properties} demoUsers={demoUsers}/>}
           {screen === "chatroom" && <ChatRoom chatId={activeChat} chatContext={activeChatContext} role={role} listingContracts={listingContracts} onContractListing={contractListingFromChat} onBack={() => setScreen("chatlist")} properties={properties} demoUsers={demoUsers}/>}
           {screen === "profile" && role === "broker" && <Subscription picked={brokerTier} availableRoles={availableRoles} onPick={setBrokerTier} onSwitchRole={switchRole}/>}

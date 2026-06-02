@@ -51,6 +51,8 @@
 - 기존 `서울 ...` seed 주소를 `서울특별시 ...`로 바꾸는 migration 추가: `202606010004_expand_seoul_addresses.sql`.
 - 데모 소유주 매물 등록은 `create_demo_listing` RPC를 사용한다. 직접 anon insert는 계속 금지.
 - `audit_demo_runtime.sql`은 `listing_contracts`가 아직 없어도 `0`/`[]`로 점검 결과를 낸다.
+- 중개사 설정의 `부동산 정보`는 부동산 등록폼으로 교체. 기존 `broker_offices` 값을 불러오고 주소찾기 선택값/상세주소/자동분류/좌표/전문 매물 유형을 저장한다.
+- 데모 중개사 부동산 등록은 `create_demo_broker_office` RPC를 사용한다. migration: `202606020002_create_demo_broker_office_rpc.sql`.
 
 ## 다음 확인
 
@@ -67,6 +69,7 @@
 - Supabase SQL Editor에서 `202606010003_koreanize_addresses.sql` 실행 후 `listing_address_quality` 결과 확인.
 - Supabase SQL Editor에서 `202606010004_expand_seoul_addresses.sql` 실행 후 `listing_address_quality.short_seoul_listing_addresses`가 `0`인지 확인.
 - Supabase SQL Editor에서 `202606010005_create_demo_listing_rpc.sql` 실행 후 소유주 계정 매물 등록 확인.
+- Supabase SQL Editor에서 `202606020001_add_broker_office_location.sql`, `202606020002_create_demo_broker_office_rpc.sql` 실행 후 중개사 설정 부동산 등록 확인.
 - 최근 점검 결과 `listing_prop_type_distribution`이 5종만 나와 `202606010002_group_property_types.sql` 재실행 필요.
 
 ## 작업 우선순위
