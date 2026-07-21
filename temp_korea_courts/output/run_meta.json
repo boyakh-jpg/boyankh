@@ -1,0 +1,14 @@
+{
+  "run_id": 29798921371,
+  "run_number": 3,
+  "repository": "boyakh-jpg/boyankh",
+  "sha": "f059773651bb00218d46e3eb81ff6b8e6d9beb11",
+  "artifact_name": "rankball-korea-courts",
+  "build_exit_code": 999,
+  "files": [
+    {
+      "path": "probe.json",
+      "bytes": 65
+    }
+  ]
+}
