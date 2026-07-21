@@ -1,0 +1,37 @@
+name: TEMP Korea courts runner
+
+on:
+  push:
+    paths:
+      - 'temp_korea_courts/**'
+      - '.github/workflows/temp-korea-courts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe network
+        run: |
+          mkdir -p temp_korea_courts/output
+          python - <<'PY'
+          import json, urllib.request
+          result = {"ok": False}
+          try:
+              with urllib.request.urlopen('https://overpass-api.de/api/status', timeout=30) as r:
+                  result = {"ok": True, "status": r.status, "sample": r.read(200).decode('utf-8', 'replace')}
+          except Exception as e:
+              result = {"ok": False, "error": repr(e)}
+          open('temp_korea_courts/output/probe.json', 'w', encoding='utf-8').write(json.dumps(result, ensure_ascii=False, indent=2))
+          PY
+      - name: Commit probe
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add temp_korea_courts/output/probe.json
+          git commit -m 'temp: korea courts runner probe' || exit 0
+          git push
