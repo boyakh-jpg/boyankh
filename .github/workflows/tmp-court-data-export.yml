@@ -8,7 +8,7 @@ on:
       - ".github/workflows/tmp-court-data-export.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   collect:
@@ -32,15 +32,26 @@ jobs:
         continue-on-error: true
         run: python /tmp/court-export/collector.py --output-dir court_export
 
-      - name: Upload data files
+      - name: Package temporary results
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: korea-basketball-courts-raw
-          path: court_export
-          if-no-files-found: error
-          retention-days: 1
+        run: |
+          rm -rf tmp/court-export/results
+          mkdir -p tmp/court-export/results
+          tar -czf /tmp/korea-basketball-courts.tar.gz -C court_export .
+          base64 -w 0 /tmp/korea-basketball-courts.tar.gz > /tmp/korea-basketball-courts.tar.gz.b64
+          split -b 400k -d -a 3 /tmp/korea-basketball-courts.tar.gz.b64 tmp/court-export/results/part-
+          sha256sum /tmp/korea-basketball-courts.tar.gz > tmp/court-export/results/archive.sha256
+          wc -c /tmp/korea-basketball-courts.tar.gz /tmp/korea-basketball-courts.tar.gz.b64 > tmp/court-export/results/archive.size
 
-      - name: Fail after artifact upload
+      - name: Commit temporary results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tmp/court-export/results
+          git commit -m "chore: store temporary court export results" || exit 0
+          git push
+
+      - name: Fail after results are stored
         if: steps.collect.outcome == 'failure'
         run: exit 1
