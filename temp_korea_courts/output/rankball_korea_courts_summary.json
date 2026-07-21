@@ -1,0 +1,96 @@
+{
+  "build_at": "2026-07-21T03:37:12+00:00",
+  "total_courts": 3097,
+  "restricted_courts": 39,
+  "school_restricted": 17,
+  "apartment_restricted": 5,
+  "dedupe_actions": 4,
+  "by_source": {
+    "openstreetmap": 2984,
+    "public_data_portal": 110,
+    "public_data_portal+openstreetmap": 3
+  },
+  "by_access": {
+    "unknown": 2909,
+    "conditional": 61,
+    "public": 88,
+    "restricted": 39
+  },
+  "by_venue": {
+    "unknown": 2894,
+    "park": 111,
+    "sports_center": 32,
+    "public_facility": 38,
+    "school": 17,
+    "apartment": 5
+  },
+  "by_sido": {
+    "강원특별자치도": 99,
+    "경기도": 902,
+    "경상남도": 214,
+    "경상북도": 216,
+    "광주광역시": 88,
+    "대구광역시": 83,
+    "대전광역시": 117,
+    "미분류": 9,
+    "부산광역시": 100,
+    "서울특별시": 379,
+    "세종특별자치시": 71,
+    "울산광역시": 41,
+    "인천광역시": 184,
+    "전라남도": 140,
+    "전북특별자치도": 120,
+    "제주특별자치도": 33,
+    "충청남도": 202,
+    "충청북도": 99
+  },
+  "source_meta": {
+    "public_data": {
+      "downloaded": true,
+      "source_rows": 7330,
+      "basketball_rows": 114,
+      "usable_rows": 113,
+      "columns": {
+        "facility": "개방시설명",
+        "place": "개방장소명",
+        "facility_type": "개방시설유형구분",
+        "closed": "휴관일",
+        "weekday_start": "평일운영시작시각",
+        "weekday_end": "평일운영종료시각",
+        "weekend_start": "주말운영시작시각",
+        "weekend_end": "주말운영종료시각",
+        "paid": "유료사용여부",
+        "fee": "사용료",
+        "amenities": "부대시설정보",
+        "application": "신청방법구분",
+        "road": "소재지도로명주소",
+        "jibun": "소재지지번주소",
+        "operator": "관리기관명",
+        "department": "담당부서명",
+        "phone": "사용안내전화번호",
+        "website": "홈페이지주소",
+        "lat": "위도",
+        "lng": "경도",
+        "reference_date": "데이터기준일자"
+      }
+    },
+    "osm": {
+      "raw_court_objects": 2988,
+      "raw_context_objects": 0,
+      "usable_rows": 2988,
+      "context_matches": 0
+    },
+    "admin_boundary": {
+      "version": "20260401",
+      "rows": 3558
+    }
+  },
+  "osm_meta": {
+    "timestamp_osm_base": "2026-06-12T12:14:17Z",
+    "timestamp_areas_base": "2026-06-12T12:14:17Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "errors": [],
+  "coverage_note": "공공데이터포털 전국공공시설개방정보표준데이터와 OpenStreetMap 등록 객체의 합집합. 미등록·폐쇄·철거·접근정책 변경은 자동으로 완전 반영되지 않음.",
+  "dedupe_rule": "동일 소스는 동일 이름+8m 이내만 병합. 공공데이터↔OSM은 15m 이내 자동, 15–30m는 이름/맥락 호환, 30–50m는 강한 이름/장소 일치일 때만 병합."
+}

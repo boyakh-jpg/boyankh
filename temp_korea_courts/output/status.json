@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "build_at": "2026-07-21T03:37:12+00:00",
+  "total_courts": 3097,
+  "public_rows": 113,
+  "osm_rows": 2988,
+  "errors": [],
+  "summary_file": "rankball_korea_courts_summary.json"
+}
