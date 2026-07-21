@@ -1,0 +1,46 @@
+name: Temporary nationwide court data export
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/tmp-court-data-export.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Decode collector
+        run: |
+          mkdir -p /tmp/court-export
+          base64 -d tmp/court-export/collector.py.gz.b64 | gzip -d > /tmp/court-export/collector.py
+          python -m py_compile /tmp/court-export/collector.py
+
+      - name: Collect public data and OSM
+        id: collect
+        continue-on-error: true
+        run: python /tmp/court-export/collector.py --output-dir court_export
+
+      - name: Upload data files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: korea-basketball-courts-raw
+          path: court_export
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Fail after artifact upload
+        if: steps.collect.outcome == 'failure'
+        run: exit 1
