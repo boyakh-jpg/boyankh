@@ -1,0 +1,40 @@
+name: Temporary BOXTIER live screenshots
+
+on:
+  push:
+    paths:
+      - '.github/workflows/temp-capture-boxtier.yml'
+      - '.github/scripts/capture-boxtier.mjs'
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Capture deployed BOXTIER
+        env:
+          BOXTIER_URL: https://platunumball.vercel.app
+        run: node .github/scripts/capture-boxtier.mjs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boxtier-live-captures
+          path: boxtier-live-captures
+          if-no-files-found: warn
+          retention-days: 1
