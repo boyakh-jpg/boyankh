@@ -5,6 +5,11 @@ on:
     paths:
       - '.github/workflows/temp-capture-boxtier.yml'
       - '.github/scripts/capture-boxtier.mjs'
+  pull_request:
+    paths:
+      - '.github/workflows/temp-capture-boxtier.yml'
+      - '.github/scripts/capture-boxtier.mjs'
+      - '.github/capture-trigger.txt'
   workflow_dispatch:
 
 jobs:
